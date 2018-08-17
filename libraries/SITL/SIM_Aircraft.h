@@ -20,6 +20,8 @@
 
 #include <AP_Math/AP_Math.h>
 
+#include <AP_HAL/utility/Socket.h>
+
 #include "SITL.h"
 #include "SITL_Input.h"
 #include <AP_Terrain/AP_Terrain.h>
@@ -116,6 +118,16 @@ protected:
     SITL *sitl;
     Location home;
     Location location;
+
+    struct ext_sensor_packet{
+      double imu_orientation_quat[4];
+      double velocity_xyz[3];
+      double position_xyz[3];
+    };
+
+    SocketAPM socket_ext_sensor; //Output socket for external sensor simulation
+    const char * address_ext_sensor = "127.0.0.1";
+    int port_ext_sensor = 9004;
 
     float ground_level;
     float home_yaw;

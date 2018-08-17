@@ -54,6 +54,7 @@ Aircraft::Aircraft(const char *home_str, const char *frame_str) :
     rate_hz(1200.0f),
     autotest_dir(nullptr),
     frame(frame_str),
+    socket_ext_sensor{true},
 #if defined(__CYGWIN__) || defined(__CYGWIN64__)
     min_sleep_time(20000)
 #else
@@ -85,6 +86,10 @@ Aircraft::Aircraft(const char *home_str, const char *frame_str) :
     enum ap_var_type ptype;
     ahrs_orientation = (AP_Int8 *)AP_Param::find("AHRS_ORIENTATION", &ptype);
     terrain = reinterpret_cast<AP_Terrain *>(AP_Param::find_object("TERRAIN_"));
+
+    //Setup socket for external sensor simulation
+    socket_ext_sensor.connect(address_ext_sensor,port_ext_sensor);
+    socket_ext_sensor.set_blocking(false);
 }
 
 
@@ -184,6 +189,14 @@ void Aircraft::update_position(void)
 
     location.alt  = static_cast<int32_t>(home.alt - position.z * 100.0f);
 
+    Quaternion attitude;
+    get_attitude(attitude);
+    struct ext_sensor_packet pkt = {
+      {attitude.q1,attitude.q2,attitude.q3,attitude.q4},
+      {velocity_ef.x,velocity_ef.y,velocity_ef.z},
+      {position.x,position.y,position.z}
+    };
+    socket_ext_sensor.send(&pkt,10*sizeof(double));
 #if 0
     // logging of raw sitl data
     Vector3f accel_ef = dcm * accel_body;
@@ -420,7 +433,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
             fdm.quaternion.from_rotation_matrix(m);
         }
     }
-    
+
     if (last_speedup != sitl->speedup && sitl->speedup > 0) {
         set_speedup(sitl->speedup);
         last_speedup = sitl->speedup;
@@ -578,8 +591,8 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
 void Aircraft::update_wind(const struct sitl_input &input)
 {
     // wind vector in earth frame
-    wind_ef = Vector3f(cosf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)), 
-                       sinf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)), 
+    wind_ef = Vector3f(cosf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)),
+                       sinf(radians(input.wind.direction))*cosf(radians(input.wind.dir_z)),
                        sinf(radians(input.wind.dir_z))) * input.wind.speed;
 
     const float wind_turb = input.wind.turbulence * 10.0f;  // scale input.wind.turbulence to match standard deviation when using iir_coef=0.98

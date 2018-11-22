@@ -63,8 +63,6 @@ public:
 
     virtual bool     in_main_thread() const = 0;
 
-    virtual void create_uavcan_thread() {};
-
     /*
       disable interrupts and return a context that can be used to
       restore the interrupt state. This can be used to protect
@@ -97,7 +95,8 @@ public:
         PRIORITY_RCIN,
         PRIORITY_IO,
         PRIORITY_UART,
-        PRIORITY_STORAGE
+        PRIORITY_STORAGE,
+        PRIORITY_SCRIPTING,
     };
     
     /*

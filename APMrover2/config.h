@@ -117,6 +117,13 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// RALLY POINTS
+//
+#ifndef AP_RALLY
+ #define AP_RALLY ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // NAVL1
 //
 #ifndef NAVL1
@@ -128,10 +135,6 @@
 //
 #ifndef CRUISE_SPEED
   #define CRUISE_SPEED    2  // in m/s
-#endif
-
-#ifndef TURN_GAIN
-  #define TURN_GAIN       5
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -171,3 +174,8 @@
  #define DEVO_TELEM_ENABLED ENABLED
 #endif
 #endif
+
+#ifndef OSD_ENABLED
+ #define OSD_ENABLED DISABLED
+#endif
+

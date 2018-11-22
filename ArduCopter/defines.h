@@ -53,6 +53,7 @@ enum control_mode_t {
     SMART_RTL =    21,  // SMART_RTL returns to home by retracing its steps
     FLOWHOLD  =    22,  // FLOWHOLD holds position with optical flow without rangefinder
     FOLLOW    =    23,  // follow attempts to follow another vehicle or ground station
+    ZIGZAG    =    24,  // ZIGZAG mode is able to fly in a zigzag manner with predefined point A and point B
 };
 
 enum mode_reason_t {
@@ -131,7 +132,7 @@ enum tuning_func {
 #define WP_YAW_BEHAVIOR_NONE                          0   // auto pilot will never control yaw during missions or rtl (except for DO_CONDITIONAL_YAW command received)
 #define WP_YAW_BEHAVIOR_LOOK_AT_NEXT_WP               1   // auto pilot will face next waypoint or home during rtl
 #define WP_YAW_BEHAVIOR_LOOK_AT_NEXT_WP_EXCEPT_RTL    2   // auto pilot will face next waypoint except when doing RTL at which time it will stay in it's last
-#define WP_YAW_BEHAVIOR_LOOK_AHEAD                    3   // auto pilot will look ahead during missions and rtl (primarily meant for traditional helicotpers)
+#define WP_YAW_BEHAVIOR_LOOK_AHEAD                    3   // auto pilot will look ahead during missions and rtl (primarily meant for traditional helicopters)
 
 // Auto modes
 enum AutoMode {
@@ -144,6 +145,7 @@ enum AutoMode {
     Auto_Spline,
     Auto_NavGuided,
     Auto_Loiter,
+    Auto_LoiterToAlt,
     Auto_NavPayloadPlace,
 };
 
@@ -230,6 +232,7 @@ enum PayloadPlaceStateType {
 // bit options for DEV_OPTIONS parameter
 enum DevOptions {
     DevOptionADSBMAVLink = 1,
+    DevOptionVFR_HUDRelativeAlt = 2,
 };
 
 //  Logging parameters
@@ -237,7 +240,6 @@ enum LoggingParameters {
      TYPE_AIRSTART_MSG,
      TYPE_GROUNDSTART_MSG,
      LOG_CONTROL_TUNING_MSG,
-     LOG_OPTFLOW_MSG,
      LOG_EVENT_MSG,
      LOG_ERROR_MSG,
      LOG_DATA_INT16_MSG,
@@ -331,6 +333,9 @@ enum LoggingParameters {
 #define DATA_WINCH_RELAXED                  68
 #define DATA_WINCH_LENGTH_CONTROL           69
 #define DATA_WINCH_RATE_CONTROL             70
+#define DATA_ZIGZAG_STORE_A                 71
+#define DATA_ZIGZAG_STORE_B                 72
+#define DATA_LAND_REPO_ACTIVE               73
 
 // Error message sub systems and error codes
 #define ERROR_SUBSYSTEM_MAIN                1
@@ -357,6 +362,7 @@ enum LoggingParameters {
 #define ERROR_SUBSYSTEM_NAVIGATION          22
 #define ERROR_SUBSYSTEM_FAILSAFE_TERRAIN    23
 #define ERROR_SUBSYSTEM_EKF_PRIMARY         24
+#define ERROR_SUBSYSTEM_THRUST_LOSS_CHECK   25
 // general error codes
 #define ERROR_CODE_ERROR_RESOLVED           0
 #define ERROR_CODE_FAILED_TO_INITIALISE     1

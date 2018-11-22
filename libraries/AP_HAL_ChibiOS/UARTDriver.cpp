@@ -110,7 +110,7 @@ void UARTDriver::thread_init(void)
 #endif
 }
 
-
+#ifndef HAL_STDOUT_SERIAL
 /*
   hook to allow printf() to work on hal.console when we don't have a
   dedicated debug console
@@ -120,7 +120,7 @@ static int hal_console_vprintf(const char *fmt, va_list arg)
     hal.console->vprintf(fmt, arg);
     return 1; // wrong length, but doesn't matter for what this is used for
 }
-
+#endif
 
 void UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
 {
@@ -131,6 +131,12 @@ void UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
     }
     uint16_t min_tx_buffer = 1024;
     uint16_t min_rx_buffer = 512;
+
+    if (sdef.is_usb) {
+        // give more buffer space for log download on USB
+        min_tx_buffer *= 4;
+    }
+    
     // on PX4 we have enough memory to have a larger transmit and
     // receive buffer for all ports. This means we don't get delays
     // while waiting to write GPS config packets
@@ -246,22 +252,28 @@ void UARTDriver::begin(uint32_t b, uint16_t rxS, uint16_t txS)
                 _device_initialised = true;
             }
             sercfg.speed = _baudrate;
+
+            // start with options from set_options()
+            sercfg.cr1 = 0;
+            sercfg.cr2 = _cr2_options;
+            sercfg.cr3 = _cr3_options;
+
             if (!sdef.dma_tx && !sdef.dma_rx) {
-                sercfg.cr1 = 0;
-                sercfg.cr3 = 0;
             } else {
                 if (sdef.dma_rx) {
-                    sercfg.cr1 = USART_CR1_IDLEIE;
-                    sercfg.cr3 = USART_CR3_DMAR;
+                    sercfg.cr1 |= USART_CR1_IDLEIE;
+                    sercfg.cr3 |= USART_CR3_DMAR;
                 }
                 if (sdef.dma_tx) {
                     sercfg.cr3 |= USART_CR3_DMAT;
                 }
             }
-            sercfg.cr2 = USART_CR2_STOP1_BITS;
+            sercfg.cr2 |= USART_CR2_STOP1_BITS;
             sercfg.irq_cb = rx_irq_cb;
             sercfg.ctx = (void*)this;
+
             sdStart((SerialDriver*)sdef.serial, &sercfg);
+
             if(sdef.dma_rx) {
                 //Configure serial driver to skip handling RX packets
                 //because we will handle them via DMA
@@ -1028,12 +1040,13 @@ void UARTDriver::set_stop_bits(int n)
     
     switch (n) {
     case 1:
-        sercfg.cr2 = USART_CR2_STOP1_BITS;
+        sercfg.cr2 = _cr2_options | USART_CR2_STOP1_BITS;
         break;
     case 2:
-        sercfg.cr2 = USART_CR2_STOP2_BITS;
+        sercfg.cr2 = _cr2_options | USART_CR2_STOP2_BITS;
         break;
     }
+
     sdStart((SerialDriver*)sdef.serial, &sercfg);
     if(sdef.dma_rx) {
         //Configure serial driver to skip handling RX packets
@@ -1073,6 +1086,92 @@ uint64_t UARTDriver::receive_time_constraint_us(uint16_t nbytes)
         last_receive_us -= transport_time_us;
     }
     return last_receive_us;
+}
+
+// set optional features, return true on success
+bool UARTDriver::set_options(uint8_t options)
+{
+    if (sdef.is_usb) {
+        // no options allowed on USB
+        return (options == 0);
+    }
+    bool ret = true;
+
+#if HAL_USE_SERIAL == TRUE
+    SerialDriver *sd = (SerialDriver*)(sdef.serial);
+    uint32_t cr2 = sd->usart->CR2;
+    uint32_t cr3 = sd->usart->CR3;
+    bool was_enabled = (sd->usart->CR1 & USART_CR1_UE);
+
+#ifdef STM32F7
+    // F7 has built-in support for inversion in all uarts
+    if (options & OPTION_RXINV) {
+        cr2 |= USART_CR2_RXINV;
+        _cr2_options |= USART_CR2_RXINV;
+    } else {
+        cr2 &= ~USART_CR2_RXINV;
+    }
+    if (options & OPTION_TXINV) {
+        cr2 |= USART_CR2_TXINV;
+        _cr2_options |= USART_CR2_TXINV;
+    } else {
+        cr2 &= ~USART_CR2_TXINV;
+    }
+    // F7 can also support swapping RX and TX pins
+    if (options & OPTION_SWAP) {
+        cr2 |= USART_CR2_SWAP;
+        _cr2_options |= USART_CR2_SWAP;
+    } else {
+        cr2 &= ~USART_CR2_SWAP;
+    }
+#else // STM32F4
+    // F4 can do inversion by GPIO if enabled in hwdef.dat, using
+    // TXINV and RXINV options
+    if (options & OPTION_RXINV) {
+        if (sdef.rxinv_gpio >= 0) {
+            hal.gpio->write(sdef.rxinv_gpio, sdef.rxinv_polarity);
+        } else {
+            ret = false;
+        }
+    }
+    if (options & OPTION_TXINV) {
+        if (sdef.txinv_gpio >= 0) {
+            hal.gpio->write(sdef.txinv_gpio, sdef.txinv_polarity);
+        } else {
+            ret = false;
+        }
+    }
+    if (options & OPTION_SWAP) {
+        ret = false;
+    }
+#endif // STM32xx
+
+    // both F4 and F7 can do half-duplex
+    if (options & OPTION_HDPLEX) {
+        cr3 |= USART_CR3_HDSEL;
+        _cr3_options |= USART_CR3_HDSEL;
+    } else {
+        cr3 &= ~USART_CR3_HDSEL;
+    }
+
+    if (sd->usart->CR2 == cr2 &&
+        sd->usart->CR3 == cr3) {
+        // no change
+        return ret;
+    }
+
+    if (was_enabled) {
+        sd->usart->CR1 &= ~USART_CR1_UE;
+    }
+
+    sd->usart->CR2 = cr2;
+    sd->usart->CR3 = cr3;
+
+    if (was_enabled) {
+        sd->usart->CR1 |= USART_CR1_UE;
+    }
+#endif // HAL_USE_SERIAL == TRUE
+    return ret;
 }
 
 #endif //CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS

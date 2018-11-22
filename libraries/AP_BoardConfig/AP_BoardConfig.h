@@ -9,7 +9,7 @@
 #include <AP_Param_Helper/AP_Param_Helper.h>
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || defined(HAL_CHIBIOS_ARCH_FMUV3) || defined(HAL_CHIBIOS_ARCH_FMUV4) || defined(HAL_CHIBIOS_ARCH_FMUV5) || defined(HAL_CHIBIOS_ARCH_MINDPXV2)
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || defined(HAL_CHIBIOS_ARCH_FMUV3) || defined(HAL_CHIBIOS_ARCH_FMUV4) || defined(HAL_CHIBIOS_ARCH_FMUV5) || defined(HAL_CHIBIOS_ARCH_MINDPXV2) || defined(HAL_CHIBIOS_ARCH_FMUV4PRO)
 #define AP_FEATURE_BOARD_DETECT 1
 #else
 #define AP_FEATURE_BOARD_DETECT 0
@@ -118,7 +118,7 @@ public:
 
     // get number of PWM outputs enabled on FMU
     static uint8_t get_pwm_count(void) {
-        return instance?instance->pwm_count.get():4;
+        return instance?instance->pwm_count.get():8;
     }
 
 #if HAL_HAVE_SAFETY_SWITCH
@@ -143,6 +143,19 @@ public:
 #endif
     }
 
+#if HAL_HAVE_BOARD_VOLTAGE
+    // get minimum board voltage
+    static float get_minimum_board_voltage(void) {
+        return instance?instance->_vbus_min.get():0;
+    }
+#endif
+
+#if HAL_HAVE_SERVO_VOLTAGE
+    // get minimum servo voltage
+    static float get_minimum_servo_voltage(void) {
+        return instance?instance->_vservo_min.get():0;
+    }
+#endif
     
 private:
     static AP_BoardConfig *instance;
@@ -207,4 +220,12 @@ private:
 
     // real-time-clock; private because access is via the singleton
     AP_RTC rtc;
+
+#if HAL_HAVE_BOARD_VOLTAGE
+    AP_Float _vbus_min;
+#endif
+
+#if HAL_HAVE_SERVO_VOLTAGE
+    AP_Float _vservo_min;
+#endif
 };

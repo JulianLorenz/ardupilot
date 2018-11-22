@@ -23,6 +23,7 @@
 #define APM_SHELL_PRIORITY       57
 #define APM_OVERTIME_PRIORITY    10
 #define APM_STARTUP_PRIORITY     10
+#define APM_SCRIPTING_PRIORITY    1
 
 /* how long to boost priority of the main thread for each main
    loop. This needs to be long enough for all interrupt-level drivers
@@ -59,8 +60,6 @@ public:
     bool     in_main_thread() const override;
     void     system_initialized();
     void     hal_initialized() { _hal_initialized = true; }
-
-    void create_uavcan_thread() override;
 
     /*
       disable interrupts and return a context that can be used to
@@ -99,18 +98,11 @@ private:
     pthread_t _io_thread_ctx;
     pthread_t _storage_thread_ctx;
     pthread_t _uart_thread_ctx;
-    pthread_t _uavcan_thread_ctx;
-
-    struct _uavcan_thread_arg {
-        PX4Scheduler *sched;
-        uint8_t uavcan_number;
-    };
 
     static void *_timer_thread(void *arg);
     static void *_io_thread(void *arg);
     static void *_storage_thread(void *arg);
     static void *_uart_thread(void *arg);
-    static void *_uavcan_thread(void *arg);
 
     void _run_timers();
     void _run_io(void);

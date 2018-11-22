@@ -23,13 +23,12 @@ void Copter::init_ardupilot()
     // initialise serial port
     serial_manager.init_console();
 
-    // init vehicle capabilties
-    init_capabilities();
-
     hal.console->printf("\n\nInit %s"
                         "\n\nFree RAM: %u\n",
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
+
+    init_capabilities();
 
     //
     // Report firmware version code expect on console (check of actual EEPROM format version is done in load_parameters function)
@@ -138,9 +137,6 @@ void Copter::init_ardupilot()
     // motors initialised so parameters can be sent
     ap.initialised_params = true;
 
-    // initialise which outputs Servo and Relay events can use
-    ServoRelayEvents.set_channel_mask(~motors->get_motor_mask());
-
     relay.init();
 
     /*
@@ -237,7 +233,7 @@ void Copter::init_ardupilot()
 
 #if MODE_AUTO_ENABLED == ENABLED
     // initialise mission library
-    mission.init();
+    mode_auto.mission.init();
 #endif
 
 #if MODE_SMARTRTL_ENABLED == ENABLED
@@ -247,7 +243,7 @@ void Copter::init_ardupilot()
 
     // initialise DataFlash library
 #if MODE_AUTO_ENABLED == ENABLED
-    DataFlash.set_mission(&mission);
+    DataFlash.set_mission(&mode_auto.mission);
 #endif
     DataFlash.setVehicle_Startup_Log_Writer(FUNCTOR_BIND(&copter, &Copter::Log_Write_Vehicle_Startup_Messages, void));
 
@@ -278,9 +274,6 @@ void Copter::init_ardupilot()
     // disable safety if requested
     BoardConfig.init_safety();
 
-    // default enable RC override
-    copter.ap.rc_override_enable = true;
-    
     hal.console->printf("\nReady to FLY ");
 
     // flag that initialisation has completed

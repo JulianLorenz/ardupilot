@@ -171,6 +171,9 @@
 #endif
 
 // Local modules
+#ifdef USER_PARAMS_ENABLED
+#include "UserParameters.h"
+#endif
 #include "Parameters.h"
 #if ADSB_ENABLED == ENABLED
 #include "avoidance_adsb.h"
@@ -265,37 +268,13 @@ private:
     SITL::SITL sitl;
 #endif
 
-    // Mission library
-#if MODE_AUTO_ENABLED == ENABLED
-    AP_Mission mission{ahrs,
-            FUNCTOR_BIND_MEMBER(&Copter::start_command, bool, const AP_Mission::Mission_Command &),
-            FUNCTOR_BIND_MEMBER(&Copter::verify_command_callback, bool, const AP_Mission::Mission_Command &),
-            FUNCTOR_BIND_MEMBER(&Copter::exit_mission, void)};
-
-    bool start_command(const AP_Mission::Mission_Command& cmd) {
-        return mode_auto.start_command(cmd);
-    }
-    bool verify_command_callback(const AP_Mission::Mission_Command& cmd) {
-        return mode_auto.verify_command_callback(cmd);
-    }
-    void exit_mission() {
-        mode_auto.exit_mission();
-    }
-#endif
-
     // Arming/Disarming mangement class
     AP_Arming_Copter arming;
 
     // Optical flow sensor
 #if OPTFLOW == ENABLED
-    OpticalFlow optflow{ahrs};
+    OpticalFlow optflow;
 #endif
-
-    // gnd speed limit required to observe optical flow sensor limits
-    float ekfGndSpdLimit;
-
-    // scale factor applied to velocity controller gain to prevent optical flow noise causing excessive angle demand noise
-    float ekfNavVelGainScaler;
 
     // system time in milliseconds of last recorded yaw reset from ekf
     uint32_t ekfYawReset_ms;
@@ -339,7 +318,7 @@ private:
             uint8_t in_arming_delay         : 1; // 24      // true while we are armed but waiting to spin motors
             uint8_t initialised_params      : 1; // 25      // true when the all parameters have been initialised. we cannot send parameters to the GCS until this is done
             uint8_t compass_init_location   : 1; // 26      // true when the compass's initial location has been set
-            uint8_t rc_override_enable      : 1; // 27      // aux switch rc_override is allowed
+            uint8_t unused2                 : 1; // 27      // aux switch rc_override is allowed
             uint8_t armed_with_switch       : 1; // 28      // we armed using a arming switch
         };
         uint32_t value;
@@ -378,7 +357,6 @@ private:
 
         int8_t radio_counter;            // number of iterations with throttle below throttle_fs_value
 
-        uint8_t rc_override_active  : 1; // true if rc control are overwritten by ground station
         uint8_t radio               : 1; // A status flag for the radio failsafe
         uint8_t gcs                 : 1; // A status flag for the ground station failsafe
         uint8_t ekf                 : 1; // true if ekf failsafe has occurred
@@ -508,7 +486,7 @@ private:
     // Camera/Antenna mount tracking and stabilisation stuff
 #if MOUNT == ENABLED
     // current_loc uses the baro/gps solution for altitude rather than gps only.
-    AP_Mount camera_mount{ahrs, current_loc};
+    AP_Mount camera_mount{current_loc};
 #endif
 
     // AC_Fence library to reduce fly-aways
@@ -546,13 +524,13 @@ private:
     AP_LandingGear landinggear;
 
     // terrain handling
-#if AP_TERRAIN_AVAILABLE && AC_TERRAIN
-    AP_Terrain terrain{ahrs, mission, rally};
+#if AP_TERRAIN_AVAILABLE && AC_TERRAIN && MODE_AUTO_ENABLED == ENABLED
+    AP_Terrain terrain{mode_auto.mission, rally};
 #endif
 
     // Precision Landing
 #if PRECISION_LANDING == ENABLED
-    AC_PrecLand precland{ahrs};
+    AC_PrecLand precland;
 #endif
 
     // Pilot Input Management Library
@@ -704,6 +682,7 @@ private:
 
     // crash_check.cpp
     void crash_check();
+    void thrust_loss_check();
     void parachute_check();
     void parachute_release();
     void parachute_manual_release();
@@ -754,9 +733,8 @@ private:
     void send_extended_status1(mavlink_channel_t chan);
     void send_nav_controller_output(mavlink_channel_t chan);
     void send_rpm(mavlink_channel_t chan);
-    void send_pid_tuning(mavlink_channel_t chan);
     void gcs_data_stream_send(void);
-    void gcs_check_input(void);
+    void gcs_update(void);
 
     // heli.cpp
     void heli_init();
@@ -779,7 +757,6 @@ private:
     void landinggear_update();
 
     // Log.cpp
-    void Log_Write_Optflow();
     void Log_Write_Control_Tuning();
     void Log_Write_Performance();
     void Log_Write_Attitude();
@@ -833,6 +810,7 @@ private:
     // Parameters.cpp
     void load_parameters(void);
     void convert_pid_parameters(void);
+    void convert_lgr_parameters(void);
 
     // position_vector.cpp
     Vector3f pv_location_to_vector(const Location& loc);
@@ -919,6 +897,10 @@ private:
     void userhook_auxSwitch2(uint8_t ch_flag);
     void userhook_auxSwitch3(uint8_t ch_flag);
 
+#if OSD_ENABLED == ENABLED
+    void publish_osd_info();
+#endif
+
 #include "mode.h"
 
     Mode *flightmode;
@@ -932,6 +914,7 @@ private:
     ModeAltHold mode_althold;
 #if MODE_AUTO_ENABLED == ENABLED
     ModeAuto mode_auto;
+    AP_Mission &mission = mode_auto.mission; // so parameters work only!
 #endif
 #if AUTOTUNE_ENABLED == ENABLED
     ModeAutoTune mode_autotune;
@@ -984,6 +967,9 @@ private:
 #endif
 #if !HAL_MINIMIZE_FEATURES && OPTFLOW == ENABLED
     ModeFlowHold mode_flowhold;
+#endif
+#if MODE_ZIGZAG_ENABLED == ENABLED
+    ModeZigZag mode_zigzag;
 #endif
 
     // mode.cpp

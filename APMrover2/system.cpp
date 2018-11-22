@@ -27,6 +27,8 @@ void Rover::init_ardupilot()
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
 
+    init_capabilities();
+
     //
     // Check the EEPROM format version before loading any parameters from EEPROM.
     //
@@ -60,11 +62,13 @@ void Rover::init_ardupilot()
     notify.init();
     notify_mode(control_mode);
 
-    ServoRelayEvents.set_channel_mask(0xFFF0);
-
     battery.init();
 
     rssi.init();
+
+    g2.airspeed.init();
+
+    g2.windvane.init();
 
     // init baro before we start the GCS, so that the CLI baro test works
     barometer.init();
@@ -78,6 +82,10 @@ void Rover::init_ardupilot()
 #endif
 #if DEVO_TELEM_ENABLED == ENABLED
     devo_telemetry.init(serial_manager);
+#endif
+
+#if OSD_ENABLED == ENABLED
+    osd.init();
 #endif
 
 #if LOGGING_ENABLED == ENABLED
@@ -135,8 +143,6 @@ void Rover::init_ardupilot()
 
     // initialize SmartRTL
     g2.smart_rtl.init();
-
-    init_capabilities();
 
     startup_ground();
 
@@ -329,6 +335,12 @@ bool Rover::arm_motors(AP_Arming::ArmingMethod method)
 
     // Set the SmartRTL home location. If activated, SmartRTL will ultimately try to land at this point
     g2.smart_rtl.set_home(true);
+
+    // initialize simple mode heading
+    rover.mode_simple.init_heading();
+
+    // save home heading for use in sail vehicles
+    rover.g2.windvane.record_home_heading();
 
     change_arm_state();
     return true;

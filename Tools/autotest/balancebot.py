@@ -49,6 +49,7 @@ class AutoTestBalanceBot(AutoTestRover):
 
     def autotest(self):
         """Autotest APMrover2 in SITL."""
+        self.check_test_syntax(test_file=os.path.realpath(__file__))
         if not self.hasInit:
             self.init()
         self.progress("Started simulator")
@@ -85,14 +86,15 @@ class AutoTestBalanceBot(AutoTestRover):
                           self.do_get_autopilot_capabilities)
 
             self.run_test("Set mode via MAV_COMMAND_DO_SET_MODE",
-                          self.do_set_mode_via_command_long)
+                          lambda: self.do_set_mode_via_command_long("HOLD"))
 
             self.run_test("Test ServoRelayEvents",
                           self.test_servorelayevents)
 
             self.run_test("Download logs", lambda:
                           self.log_download(
-                              self.buildlogs_path("APMrover2-log.bin")))
+                              self.buildlogs_path("APMrover2-log.bin"),
+                              upload_logs=len(self.fail_list)>0))
     #        if not drive_left_circuit(self):
     #            self.progress("Failed left circuit")
     #            failed = True

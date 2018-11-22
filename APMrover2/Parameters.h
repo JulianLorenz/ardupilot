@@ -3,6 +3,8 @@
 #include <AP_Common/AP_Common.h>
 
 #include "RC_Channel.h"
+#include "AC_Sprayer/AC_Sprayer.h"
+#include "AP_Rally.h"
 
 // Global parameter class.
 //
@@ -201,6 +203,7 @@ public:
         k_param_barometer,
         k_param_notify,
         k_param_button,
+        k_param_osd,
 
         k_param_DataFlash = 253,  // Logging Group
 
@@ -311,6 +314,7 @@ public:
 
     // wheel encoders
     AP_WheelEncoder wheel_encoder;
+    AP_WheelRateControl wheel_rate_control;
 
     // steering and throttle controller
     AR_AttitudeControl attitude_control;
@@ -357,6 +361,29 @@ public:
 
     // loiter type
     AP_Int8 loit_type;
+    AP_Float loit_radius;
+
+    // Sprayer
+    AC_Sprayer sprayer;
+
+    // Rally point library
+    AP_Rally_Rover rally;
+
+    // Simple mode types
+    AP_Int8 simple_type;
+
+    // sailboat parameters
+    AP_Float sail_angle_min;
+    AP_Float sail_angle_max;
+    AP_Float sail_angle_ideal;
+    AP_Float sail_heel_angle_max;
+    AP_Float sail_no_go;
+
+    // windvane
+    AP_WindVane windvane;
+
+    // Airspeed
+    AP_Airspeed airspeed;
 };
 
 extern const AP_Param::Info var_info[];

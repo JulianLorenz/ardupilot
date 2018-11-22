@@ -5,7 +5,7 @@
 #include <GCS_MAVLink/GCS_MAVLink.h>
 #include <stdint.h>
 #include "PosVelEKF.h"
-#include <AP_Buffer/AP_Buffer.h>
+#include <AP_HAL/utility/RingBuffer.h>
 #include <AP_AHRS/AP_AHRS.h>
 
 // declare backend classes
@@ -25,7 +25,7 @@ class AC_PrecLand
     friend class AC_PrecLand_SITL;
 
 public:
-    AC_PrecLand(const AP_AHRS_NavEKF& ahrs);
+    AC_PrecLand();
 
     /* Do not allow copies */
     AC_PrecLand(const AC_PrecLand &other) = delete;
@@ -48,7 +48,8 @@ public:
     };
 
     // perform any required initialisation of landing controllers
-    void init();
+    // update_rate_hz should be the rate at which the update method will be called in hz
+    void init(uint16_t update_rate_hz);
 
     // returns true if precision landing is healthy
     bool healthy() const { return _backend_state.healthy; }
@@ -114,14 +115,12 @@ private:
     // results are stored in_target_pos_rel_out_NE, _target_vel_rel_out_NE
     void run_output_prediction();
 
-    // references to inertial nav and ahrs libraries
-    const AP_AHRS_NavEKF&       _ahrs;
-
     // parameters
     AP_Int8                     _enabled;           // enabled/disabled and behaviour
     AP_Int8                     _type;              // precision landing sensor type
     AP_Int8                     _bus;               // which sensor bus
     AP_Int8                     _estimator_type;    // precision landing estimator type
+    AP_Float                    _lag;               // sensor lag in seconds
     AP_Float                    _yaw_align;         // Yaw angle from body x-axis to sensor x-axis.
     AP_Float                    _land_ofs_cm_x;     // Desired landing position of the camera forward of the target in vehicle body frame
     AP_Float                    _land_ofs_cm_y;     // Desired landing position of the camera right of the target in vehicle body frame
@@ -143,15 +142,16 @@ private:
     Vector2f                    _target_pos_rel_out_NE; // target's position relative to the camera, fed into position controller
     Vector2f                    _target_vel_rel_out_NE; // target's velocity relative to the CG, fed into position controller
 
-    // structure and buffer to hold a short history of vehicle velocity
+    // structure and buffer to hold a history of vehicle velocity
     struct inertial_data_frame_s {
         Matrix3f Tbn;                               // dcm rotation matrix to rotate body frame to north
         Vector3f correctedVehicleDeltaVelocityNED;
         Vector3f inertialNavVelocity;
         bool inertialNavVelocityValid;
         float dt;
+        uint64_t time_usec;
     };
-    AP_Buffer<inertial_data_frame_s,8>       _inertial_history;
+    ObjectArray<inertial_data_frame_s> *_inertial_history;
 
     // backend state
     struct precland_state {

@@ -104,9 +104,6 @@ FlightAxis::FlightAxis(const char *home_str, const char *frame_str) :
         }
     }
 
-    /* Create the thread that will be waiting for data from FlightAxis */
-    mutex = hal.util->new_semaphore();
-
     int ret = pthread_create(&thread, NULL, update_thread, this);
     if (ret != 0) {
         AP_HAL::panic("SIM_FlightAxis: failed to create thread");
@@ -139,9 +136,10 @@ void FlightAxis::update_loop(void)
 {
     while (true) {
         struct sitl_input new_input;
-        mutex->take(HAL_SEMAPHORE_BLOCK_FOREVER);
-        new_input = last_input;
-        mutex->give();
+        {
+            WITH_SEMAPHORE(mutex);
+            new_input = last_input;
+        }
         exchange_data(new_input);
     }
 }
@@ -339,7 +337,7 @@ void FlightAxis::exchange_data(const struct sitl_input &input)
                                scaled_servos[7]);
 
     if (reply) {
-        mutex->take(HAL_SEMAPHORE_BLOCK_FOREVER);
+        WITH_SEMAPHORE(mutex);
         double lastt_s = state.m_currentPhysicsTime_SEC;
         parse_reply(reply);
         double dt = state.m_currentPhysicsTime_SEC - lastt_s;
@@ -350,7 +348,6 @@ void FlightAxis::exchange_data(const struct sitl_input &input)
             average_frame_time_s = average_frame_time_s * 0.98 + dt * 0.02;
         }
         socket_frame_counter++;
-        mutex->give();
         free(reply);
     }
 }
@@ -361,7 +358,7 @@ void FlightAxis::exchange_data(const struct sitl_input &input)
  */
 void FlightAxis::update(const struct sitl_input &input)
 {
-    mutex->take(HAL_SEMAPHORE_BLOCK_FOREVER);
+    WITH_SEMAPHORE(mutex);
     
     last_input = input;
     
@@ -371,7 +368,6 @@ void FlightAxis::update(const struct sitl_input &input)
         initial_time_s = time_now_us * 1.0e-6f;
         last_time_s = state.m_currentPhysicsTime_SEC;
         position_offset.zero();
-        mutex->give();
         return;
     }
     if (dt_seconds < 0.00001f) {
@@ -382,14 +378,12 @@ void FlightAxis::update(const struct sitl_input &input)
         }
         if (delta_time <= 0) {
             usleep(1000);
-            mutex->give();
             return;
         }
         time_now_us += delta_time * 1.0e6;
         extrapolate_sensors(delta_time);
         update_position();
         update_mag_field_bf();
-        mutex->give();
         usleep(delta_time*1.0e6);
         extrapolated_s += delta_time;
         report_FPS();
@@ -428,7 +422,7 @@ void FlightAxis::update(const struct sitl_input &input)
                state.m_accelerationBodyAZ_MPS2);
 
     // accel on the ground is nasty in realflight, and prevents helicopter disarm
-    if (state.m_isTouchingGround) {
+    if (!is_zero(state.m_isTouchingGround)) {
         Vector3f accel_ef = (velocity_ef - last_velocity_ef) / dt_seconds;
         accel_ef.z -= GRAVITY_MSS;
         accel_body = dcm.transposed() * accel_ef;
@@ -441,7 +435,7 @@ void FlightAxis::update(const struct sitl_input &input)
     accel_body.z = constrain_float(accel_body.z, -a_limit, a_limit);
 
     // offset based on first position to account for offset in RF world
-    if (position_offset.is_zero() || state.m_resetButtonHasBeenPressed) {
+    if (position_offset.is_zero() || !is_zero(state.m_resetButtonHasBeenPressed)) {
         position_offset = position;
     }
     position -= position_offset;
@@ -481,7 +475,6 @@ void FlightAxis::update(const struct sitl_input &input)
 
     // update magnetic field
     update_mag_field_bf();
-    mutex->give();
 
     report_FPS();
 }
@@ -492,7 +485,7 @@ void FlightAxis::update(const struct sitl_input &input)
 void FlightAxis::report_FPS(void)
 {
     if (frame_counter++ % 1000 == 0) {
-        if (last_frame_count_s != 0) {
+        if (!is_zero(last_frame_count_s)) {
             uint64_t frames = socket_frame_counter - last_socket_frame_counter;
             last_socket_frame_counter = socket_frame_counter;
             double dt = state.m_currentPhysicsTime_SEC - last_frame_count_s;

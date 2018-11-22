@@ -18,8 +18,6 @@ protected:
 
     AP_Mission *get_mission() override;
     AP_Rally *get_rally() const override;
-    Compass *get_compass() const override;
-    AP_Camera *get_camera() const override;
     MAV_RESULT handle_flight_termination(const mavlink_command_long_t &packet) override;
     AP_AdvancedFailsafe *get_advanced_failsafe() const override;
     AP_VisualOdom *get_visual_odom() const override;
@@ -35,8 +33,13 @@ protected:
 
     void send_position_target_global_int() override;
 
+    MAV_RESULT handle_command_do_set_roi(const Location &roi_loc) override;
+
+    MAV_RESULT handle_command_mount(const mavlink_command_long_t &packet) override;
     MAV_RESULT handle_command_int_packet(const mavlink_command_int_t &packet) override;
     MAV_RESULT handle_command_long_packet(const mavlink_command_long_t &packet) override;
+
+    void handle_mount_message(const mavlink_message_t* msg) override;
 
 private:
 
@@ -55,5 +58,8 @@ private:
     MAV_STATE system_status() const override;
 
     int16_t vfr_hud_throttle() const override;
+    float vfr_hud_alt() const override;
+
+    void send_pid_tuning();
 
 };

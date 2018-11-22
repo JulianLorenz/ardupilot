@@ -172,12 +172,6 @@ AP_HAL::DigitalSource* VRBRAINGPIO::channel(uint16_t n) {
     return new VRBRAINDigitalSource(0);
 }
 
-/* Interrupt interface: */
-bool VRBRAINGPIO::attach_interrupt(uint8_t interrupt_num, AP_HAL::Proc p, uint8_t mode)
-{
-    return true;
-}
-
 /*
   return true when USB connected
  */

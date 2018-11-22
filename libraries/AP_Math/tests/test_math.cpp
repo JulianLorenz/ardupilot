@@ -1,3 +1,9 @@
+
+// given we are in the Math library, you're epected to know what
+// you're doing when directly comparing floats:
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+
 #include <AP_gtest.h>
 
 #include <AP_Math/AP_Math.h>
@@ -255,6 +261,7 @@ TEST(MathWrapTest, Angle360)
     EXPECT_EQ(18000.f, wrap_360_cd(18000.f));
     EXPECT_EQ(27000.f, wrap_360_cd(27000.f));
     EXPECT_EQ(0.f,     wrap_360_cd(36000.f));
+    EXPECT_EQ(5.f,     wrap_360_cd(36005.f));
     EXPECT_EQ(0.f,     wrap_360_cd(72000.f));
     EXPECT_EQ(0.f,     wrap_360_cd(360000.f));
     EXPECT_EQ(0.f,     wrap_360_cd(720000.f));
@@ -265,6 +272,7 @@ TEST(MathWrapTest, Angle360)
     EXPECT_EQ(18000.f, wrap_360_cd(-18000.f));
     EXPECT_EQ(9000.f,  wrap_360_cd(-27000.f));
     EXPECT_EQ(0.f,     wrap_360_cd(-36000.f));
+    EXPECT_EQ(35995.0f,wrap_360_cd(-36005.f));
     EXPECT_EQ(0.f,     wrap_360_cd(-72000.f));
 }
 
@@ -290,3 +298,5 @@ TEST(MathWrapTest, Angle2PI)
 }
 
 AP_GTEST_MAIN()
+
+#pragma GCC diagnostic pop

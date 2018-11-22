@@ -65,7 +65,7 @@ class AutoTestQuadPlane(AutoTest):
                                     gdb=self.gdb,
                                     gdbserver=self.gdbserver,
                                     breakpoints=self.breakpoints,
-        )
+                                    )
         self.mavproxy = util.start_MAVProxy_SITL(
             'QuadPlane', options=self.mavproxy_options())
         self.mavproxy.expect('Telemetry log: (\S+)\r\n')
@@ -111,8 +111,7 @@ class AutoTestQuadPlane(AutoTest):
     def fly_mission(self, filename, fence, height_accuracy=-1):
         """Fly a mission from a file."""
         self.progress("Flying mission %s" % filename)
-        self.mavproxy.send('wp load %s\n' % filename)
-        self.mavproxy.expect('Flight plan received')
+        self.load_mission(filename)
         self.mavproxy.send('fence load %s\n' % fence)
         self.mavproxy.send('wp list\n')
         self.mavproxy.expect('Requesting [0-9]+ waypoints')
@@ -120,17 +119,19 @@ class AutoTestQuadPlane(AutoTest):
         self.wait_mode('AUTO')
         self.wait_waypoint(1, 19, max_dist=60, timeout=1200)
 
-        self.mavproxy.expect('DISARMED')
+        self.mav.motors_disarmed_wait()
         # wait for blood sample here
         self.mavproxy.send('wp set 20\n')
+        self.wait_ready_to_arm()
         self.arm_vehicle()
         self.wait_waypoint(20, 34, max_dist=60, timeout=1200)
 
-        self.mavproxy.expect('DISARMED')
+        self.mav.motors_disarmed_wait()
         self.progress("Mission OK")
 
     def autotest(self):
         """Autotest QuadPlane in SITL."""
+        self.check_test_syntax(test_file=os.path.realpath(__file__))
         if not self.hasInit:
             self.init()
 
@@ -150,8 +151,9 @@ class AutoTestQuadPlane(AutoTest):
 
             # wait for EKF and GPS checks to pass
             self.progress("Waiting reading for arm")
-            self.wait_seconds(30)
+            self.wait_ready_to_arm()
 
+            self.run_test("Arm features", self.test_arm_feature)
             self.arm_vehicle()
 
             m = os.path.join(testdir, "ArduPlane-Missions/Dalby-OBC2016.txt")
@@ -159,7 +161,7 @@ class AutoTestQuadPlane(AutoTest):
                              "ArduPlane-Missions/Dalby-OBC2016-fence.txt")
 
             self.run_test("Mission", lambda: self.fly_mission(m, f))
-        except pexpect.TIMEOUT as e:
+        except pexpect.TIMEOUT:
             self.progress("Failed with timeout")
             self.fail_list.append("Failed with timeout")
 

@@ -17,12 +17,13 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_HAL/utility/OwnPtr.h>
 #include <stdio.h>
+
+#if HAL_USE_I2C == TRUE || HAL_USE_SPI == TRUE
+
 #include "Scheduler.h"
 #include "Semaphores.h"
 #include "Util.h"
 #include "hwdef/common/stm32_util.h"
-
-#if HAL_USE_I2C == TRUE || HAL_USE_SPI == TRUE
 
 using namespace ChibiOS;
 
@@ -79,7 +80,7 @@ void DeviceBus::bus_thread(void *arg)
         if (next_needed >= now && next_needed - now < delay) {
             delay = next_needed - now;
         }
-        // don't delay for less than 400usec, so one thread doesn't
+        // don't delay for less than 100usec, so one thread doesn't
         // completely dominate the CPU
         if (delay < 100) {
             delay = 100;

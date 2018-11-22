@@ -37,10 +37,10 @@ public:
     AP_MotorsMulticopter(uint16_t loop_rate, uint16_t speed_hz = AP_MOTORS_SPEED_DEFAULT);
 
     // output - sends commands to the motors
-    virtual void        output();
+    virtual void        output() override;
 
     // output_min - sends minimum values out to the motors
-    void                output_min();
+    void                output_min() override;
 
     // set_yaw_headroom - set yaw headroom (yaw is given at least this amount of pwm)
     void                set_yaw_headroom(int16_t pwm) { _yaw_headroom = pwm; }
@@ -51,7 +51,7 @@ public:
 
     // update estimated throttle required to hover
     void                update_throttle_hover(float dt);
-    virtual float       get_throttle_hover() const { return _throttle_hover; }
+    virtual float       get_throttle_hover() const override { return _throttle_hover; }
 
     // spool up states
     enum spool_up_down_mode {
@@ -86,6 +86,10 @@ public:
     // flight. Thrust is in the range 0 to 1
     virtual void        output_motor_mask(float thrust, uint8_t mask);
 
+    // get_motor_mask - returns a bitmask of which outputs are being used for motors (1 means being used)
+    //  this can be used to ensure other pwm outputs (i.e. for servos) do not conflict
+    virtual uint16_t    get_motor_mask() override;
+
     // get minimum or maximum pwm value that can be output to motors
     int16_t             get_pwm_output_min() const;
     int16_t             get_pwm_output_max() const;
@@ -108,7 +112,7 @@ protected:
     virtual void        output_to_motors() = 0;
 
     // update the throttle input filter
-    virtual void        update_throttle_filter();
+    virtual void        update_throttle_filter() override;
 
     // return current_limit as a number from 0 ~ 1 in the range throttle_min to throttle_max
     virtual float       get_current_limit_max_throttle();
@@ -135,7 +139,7 @@ protected:
     virtual void        output_boost_throttle(void);
     
     // save parameters as part of disarming
-    void save_params_on_disarm();
+    void save_params_on_disarm() override;
 
     // enum values for HOVER_LEARN parameter
     enum HoverLearn {

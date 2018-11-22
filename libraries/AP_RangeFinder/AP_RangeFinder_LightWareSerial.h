@@ -16,7 +16,7 @@ public:
     static bool detect(AP_SerialManager &serial_manager, uint8_t serial_instance);
 
     // update state
-    void update(void);
+    void update(void) override;
 
 protected:
 
@@ -29,7 +29,6 @@ private:
     bool get_reading(uint16_t &reading_cm);
 
     AP_HAL::UARTDriver *uart = nullptr;
-    uint32_t last_reading_ms = 0;
     char linebuf[10];
     uint8_t linebuf_len = 0;
 };

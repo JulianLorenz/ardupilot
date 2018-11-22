@@ -176,7 +176,7 @@ float Aircraft::hagl() const
 */
 bool Aircraft::on_ground() const
 {
-    return hagl() <= 0;
+    return hagl() <= 0.001f;  // prevent bouncing around ground
 }
 
 /*
@@ -228,6 +228,11 @@ void Aircraft::update_mag_field_bf()
     // calculate frame height above ground
     const float frame_height_agl = fmaxf((-position.z) + home.alt * 0.01f - ground_level, 0.0f);
 
+    if (!sitl) {
+        // running example program
+        return;
+    }
+
     // calculate scaling factor that varies from 1 at ground level to 1/8 at sitl->mag_anomaly_hgt
     // Assume magnetic anomaly strength scales with 1/R**3
     float anomaly_scaler = (sitl->mag_anomaly_hgt / (frame_height_agl + sitl->mag_anomaly_hgt));
@@ -272,7 +277,7 @@ void Aircraft::setup_frame_time(float new_rate, float new_speedup)
 /* adjust frame_time calculation */
 void Aircraft::adjust_frame_time(float new_rate)
 {
-    if (rate_hz != new_rate) {
+    if (!is_equal(rate_hz, new_rate)) {
         rate_hz = new_rate;
         frame_time_us = static_cast<uint64_t>(1.0e6f/rate_hz);
         scaled_frame_time_us = frame_time_us/target_speedup;
@@ -434,7 +439,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
         }
     }
 
-    if (last_speedup != sitl->speedup && sitl->speedup > 0) {
+    if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0) {
         set_speedup(sitl->speedup);
         last_speedup = sitl->speedup;
     }

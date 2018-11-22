@@ -4,6 +4,7 @@
 #include "AP_Mission.h"
 #include <AP_Terrain/AP_Terrain.h>
 #include <GCS_MAVLink/GCS.h>
+#include <AP_AHRS/AP_AHRS.h>
 
 const AP_Param::GroupInfo AP_Mission::var_info[] = {
 
@@ -36,6 +37,8 @@ extern const AP_HAL::HAL& hal;
 
 // storage object
 StorageAccess AP_Mission::_storage(StorageManager::StorageMission);
+
+HAL_Semaphore_Recursive AP_Mission::_rsem;
 
 ///
 /// public mission methods
@@ -116,16 +119,16 @@ void AP_Mission::resume()
     // re-entering AUTO mode and the nav_cmd callback needs to be run
     // to setup the current target waypoint
 
-    // Note: if there is no active command then the mission must have been stopped just after the previous nav command completed
-    //      update will take care of finding and starting the nav command
-    if (_flags.nav_cmd_loaded) {
-        _cmd_start_fn(_nav_cmd);
+    if (_flags.do_cmd_loaded && _do_cmd.index != AP_MISSION_CMD_INDEX_NONE) {
+        // restart the active do command, which will also load the nav command for us
+        set_current_cmd(_do_cmd.index);
+    } else if (_flags.nav_cmd_loaded) {
+        // restart the active nav command
+        set_current_cmd(_nav_cmd.index);
     }
 
-    // restart active do command
-    if (_flags.do_cmd_loaded && _do_cmd.index != AP_MISSION_CMD_INDEX_NONE) {
-        _cmd_start_fn(_do_cmd);
-    }
+    // Note: if there is no active command then the mission must have been stopped just after the previous nav command completed
+    //      update will take care of finding and starting the nav command
 }
 
 /// check mission starts with a takeoff command
@@ -137,13 +140,26 @@ bool AP_Mission::starts_with_takeoff_cmd()
         cmd_index = AP_MISSION_FIRST_REAL_COMMAND;
     }
 
-    if (!get_next_nav_cmd(cmd_index, cmd)) {
-        return false;
+    // check a maximum of 16 items, remembering that missions can have
+    // loops in them
+    for (uint8_t i=0; i<16; i++, cmd_index++) {
+        if (!get_next_nav_cmd(cmd_index, cmd)) {
+            return false;
+        }
+        switch (cmd.id) {
+        // any of these are considered a takeoff command:
+        case MAV_CMD_NAV_TAKEOFF:
+        case MAV_CMD_NAV_TAKEOFF_LOCAL:
+            return true;
+        // any of these are considered "skippable" when determining if
+        // we "start with a takeoff command"
+        case MAV_CMD_NAV_DELAY:
+            continue;
+        default:
+            return false;
+        }
     }
-    if (cmd.id != MAV_CMD_NAV_TAKEOFF) {
-        return false;
-    }
-    return true;
+    return false;
 }
 
 /// start_or_resume - if MIS_AUTORESTART=0 this will call resume(), otherwise it will call start()
@@ -220,7 +236,7 @@ void AP_Mission::update()
         }
     }else{
         // run the active nav command
-        if (_cmd_verify_fn(_nav_cmd)) {
+        if (verify_command(_nav_cmd)) {
             // market _nav_cmd as complete (it will be started on the next iteration)
             _flags.nav_cmd_loaded = false;
             // immediately advance to the next mission command
@@ -236,11 +252,49 @@ void AP_Mission::update()
     if (!_flags.do_cmd_loaded) {
         advance_current_do_cmd();
     }else{
-        // run the active do command
-        if (_cmd_verify_fn(_do_cmd)) {
-            // market _nav_cmd as complete (it will be started on the next iteration)
+        // check the active do command
+        if (verify_command(_do_cmd)) {
+            // mark _do_cmd as complete
             _flags.do_cmd_loaded = false;
         }
+    }
+}
+
+bool AP_Mission::verify_command(const Mission_Command& cmd)
+{
+    switch (cmd.id) {
+        // do-commands always return true for verify:
+    case MAV_CMD_DO_GRIPPER:
+    case MAV_CMD_DO_SET_SERVO:
+    case MAV_CMD_DO_SET_RELAY:
+    case MAV_CMD_DO_REPEAT_SERVO:
+    case MAV_CMD_DO_REPEAT_RELAY:
+    case MAV_CMD_DO_DIGICAM_CONFIGURE:
+    case MAV_CMD_DO_DIGICAM_CONTROL:
+    case MAV_CMD_DO_SET_CAM_TRIGG_DIST:
+        return true;
+    default:
+        return _cmd_verify_fn(cmd);
+    }
+}
+
+bool AP_Mission::start_command(const Mission_Command& cmd)
+{
+    switch (cmd.id) {
+    case MAV_CMD_DO_GRIPPER:
+        return start_command_do_gripper(cmd);
+    case MAV_CMD_DO_SET_SERVO:
+    case MAV_CMD_DO_SET_RELAY:
+    case MAV_CMD_DO_REPEAT_SERVO:
+    case MAV_CMD_DO_REPEAT_RELAY:
+        return start_command_do_servorelayevents(cmd);
+    case MAV_CMD_DO_CONTROL_VIDEO:
+    case MAV_CMD_DO_DIGICAM_CONFIGURE:
+    case MAV_CMD_DO_DIGICAM_CONTROL:
+    case MAV_CMD_DO_SET_CAM_TRIGG_DIST:
+        return start_command_camera(cmd);
+    default:
+        return _cmd_start_fn(cmd);
     }
 }
 
@@ -300,15 +354,13 @@ bool AP_Mission::get_next_nav_cmd(uint16_t start_index, Mission_Command& cmd)
         if (!get_next_cmd(cmd_index, cmd, false)) {
             // no more commands so return failure
             return false;
-        }else{
-            // if found a "navigation" command then return it
-            if (is_nav_cmd(cmd)) {
-                return true;
-            }else{
-                // move on in list
-                cmd_index++;
-            }
         }
+        // if found a "navigation" command then return it
+        if (is_nav_cmd(cmd)) {
+            return true;
+        }
+        // move on in list
+        cmd_index++;
     }
 
     // if we got this far we did not find a navigation command
@@ -402,46 +454,11 @@ bool AP_Mission::set_current_cmd(uint16_t index)
         return true;
     }
 
-    // the state must be MISSION_RUNNING
-    // search until we find next nav command or reach end of command list
-    while (!_flags.nav_cmd_loaded) {
-        // get next command
-        if (!get_next_cmd(index, cmd, true)) {
-            // if we run out of nav commands mark mission as complete
-            complete();
-            // return true because we did what was requested
-            // which was apparently to jump to a command at the end of the mission
-            return true;
-        }
-
-        // check if navigation or "do" command
-        if (is_nav_cmd(cmd)) {
-            // save previous nav command index
-            _prev_nav_cmd_id = _nav_cmd.id;
-            _prev_nav_cmd_index = _nav_cmd.index;
-            // save separate previous nav command index if it contains lat,long,alt
-            if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
-                _prev_nav_cmd_wp_index = _nav_cmd.index;
-            }
-            // set current navigation command and start it
-            _nav_cmd = cmd;
-            _flags.nav_cmd_loaded = true;
-            _cmd_start_fn(_nav_cmd);
-        }else{
-            // set current do command and start it (if not already set)
-            if (!_flags.do_cmd_loaded) {
-                _do_cmd = cmd;
-                _flags.do_cmd_loaded = true;
-                _cmd_start_fn(_do_cmd);
-            }
-        }
-        // move onto next command
-        index = cmd.index+1;
-    }
-
-    // if we have not found a do command then set flag to show there are no do-commands to be run before nav command completes
-    if (!_flags.do_cmd_loaded) {
-        _flags.do_cmd_all_done = true;
+    // the state must be MISSION_RUNNING, allow advance_current_nav_cmd() to manage starting the item
+    if (!advance_current_nav_cmd(index)) {
+        // on failure set mission complete
+        complete();
+        return false;
     }
 
     // if we got this far we must have successfully advanced the nav command
@@ -452,6 +469,8 @@ bool AP_Mission::set_current_cmd(uint16_t index)
 ///     true is return if successful
 bool AP_Mission::read_cmd_from_storage(uint16_t index, Mission_Command& cmd) const
 {
+    WITH_SEMAPHORE(_rsem);
+    
     // exit immediately if index is beyond last command but we always let cmd #0 (i.e. home) be read
     if (index >= (unsigned)_cmd_total && index != 0) {
         return false;
@@ -462,7 +481,7 @@ bool AP_Mission::read_cmd_from_storage(uint16_t index, Mission_Command& cmd) con
         cmd.index = 0;
         cmd.id = MAV_CMD_NAV_WAYPOINT;
         cmd.p1 = 0;
-        cmd.content.location = _ahrs.get_home();
+        cmd.content.location = AP::ahrs().get_home();
     }else{
         // Find out proper location in memory by using the start_byte position + the index
         // we can load a command, we don't process it yet
@@ -493,6 +512,8 @@ bool AP_Mission::read_cmd_from_storage(uint16_t index, Mission_Command& cmd) con
 ///     true is returned if successful
 bool AP_Mission::write_cmd_to_storage(uint16_t index, Mission_Command& cmd)
 {
+    WITH_SEMAPHORE(_rsem);
+    
     // range check cmd's index
     if (index >= num_commands_max()) {
         return false;
@@ -526,7 +547,7 @@ void AP_Mission::write_home_to_storage()
 {
     Mission_Command home_cmd = {};
     home_cmd.id = MAV_CMD_NAV_WAYPOINT;
-    home_cmd.content.location = _ahrs.get_home();
+    home_cmd.content.location = AP::ahrs().get_home();
     write_cmd_to_storage(0,home_cmd);
 }
 
@@ -1378,7 +1399,7 @@ void AP_Mission::complete()
 ///     do command will also be loaded
 ///     accounts for do-jump commands
 //      returns true if command is advanced, false if failed (i.e. mission completed)
-bool AP_Mission::advance_current_nav_cmd()
+bool AP_Mission::advance_current_nav_cmd(uint16_t starting_index)
 {
     Mission_Command cmd;
     uint16_t cmd_index;
@@ -1399,7 +1420,7 @@ bool AP_Mission::advance_current_nav_cmd()
     _flags.do_cmd_all_done = false;
 
     // get starting point for search
-    cmd_index = _nav_cmd.index;
+    cmd_index = starting_index > 0 ? starting_index - 1 : _nav_cmd.index;
     if (cmd_index == AP_MISSION_CMD_INDEX_NONE) {
         // start from beginning of the mission command list
         cmd_index = AP_MISSION_FIRST_REAL_COMMAND;
@@ -1429,14 +1450,15 @@ bool AP_Mission::advance_current_nav_cmd()
             }
             // set current navigation command and start it
             _nav_cmd = cmd;
-            _flags.nav_cmd_loaded = true;
-            _cmd_start_fn(_nav_cmd);
+            if (start_command(_nav_cmd)) {
+                _flags.nav_cmd_loaded = true;
+            }
         }else{
             // set current do command and start it (if not already set)
             if (!_flags.do_cmd_loaded) {
                 _do_cmd = cmd;
                 _flags.do_cmd_loaded = true;
-                _cmd_start_fn(_do_cmd);
+                start_command(_do_cmd);
             } else {
                 // protect against endless loops of do-commands
                 if (max_loops-- == 0) {
@@ -1490,7 +1512,7 @@ void AP_Mission::advance_current_do_cmd()
         // set current do command and start it
         _do_cmd = cmd;
         _flags.do_cmd_loaded = true;
-        _cmd_start_fn(_do_cmd);
+        start_command(_do_cmd);
     }else{
         // set flag to stop unnecessarily searching for do commands
         _flags.do_cmd_all_done = true;
@@ -1694,7 +1716,7 @@ uint16_t AP_Mission::get_landing_sequence_start()
 {
     struct Location current_loc;
 
-    if (!_ahrs.get_position(current_loc)) {
+    if (!AP::ahrs().get_position(current_loc)) {
         return 0;
     }
 
@@ -1785,4 +1807,16 @@ const char *AP_Mission::Mission_Command::type() const {
     default:
         return "?";
     }
+}
+
+// singleton instance
+AP_Mission *AP_Mission::_singleton;
+
+namespace AP {
+
+AP_Mission *mission()
+{
+    return AP_Mission::get_singleton();
+}
+
 }

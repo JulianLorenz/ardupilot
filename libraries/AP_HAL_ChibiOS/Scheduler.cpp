@@ -36,17 +36,26 @@
 #include "shared_dma.h"
 #include "sdcard.h"
 
+#if HAL_WITH_IO_MCU
+#include <AP_IOMCU/AP_IOMCU.h>
+extern AP_IOMCU iomcu;
+#endif
+
 using namespace ChibiOS;
 
 extern const AP_HAL::HAL& hal;
-THD_WORKING_AREA(_timer_thread_wa, 2048);
-THD_WORKING_AREA(_rcin_thread_wa, 512);
-THD_WORKING_AREA(_io_thread_wa, 2048);
-THD_WORKING_AREA(_storage_thread_wa, 2048);
-#if HAL_WITH_UAVCAN
-THD_WORKING_AREA(_uavcan_thread_wa, 4096);
+#ifndef HAL_NO_TIMER_THREAD
+THD_WORKING_AREA(_timer_thread_wa, TIMER_THD_WA_SIZE);
 #endif
-
+#ifndef HAL_NO_RCIN_THREAD
+THD_WORKING_AREA(_rcin_thread_wa, RCIN_THD_WA_SIZE);
+#endif
+#ifndef HAL_USE_EMPTY_IO
+THD_WORKING_AREA(_io_thread_wa, IO_THD_WA_SIZE);
+#endif
+#ifndef HAL_USE_EMPTY_STORAGE
+THD_WORKING_AREA(_storage_thread_wa, STORAGE_THD_WA_SIZE);
+#endif
 Scheduler::Scheduler()
 {
 }
@@ -55,41 +64,42 @@ void Scheduler::init()
 {
     chBSemObjectInit(&_timer_semaphore, false);
     chBSemObjectInit(&_io_semaphore, false);
+
+#ifndef HAL_NO_TIMER_THREAD
     // setup the timer thread - this will call tasks at 1kHz
     _timer_thread_ctx = chThdCreateStatic(_timer_thread_wa,
                      sizeof(_timer_thread_wa),
                      APM_TIMER_PRIORITY,        /* Initial priority.    */
                      _timer_thread,             /* Thread function.     */
                      this);                     /* Thread parameter.    */
-
-    // setup the uavcan thread - this will call tasks at 1kHz
-#if HAL_WITH_UAVCAN
-    _uavcan_thread_ctx = chThdCreateStatic(_uavcan_thread_wa,
-                     sizeof(_uavcan_thread_wa),
-                     APM_UAVCAN_PRIORITY,        /* Initial priority.    */
-                     _uavcan_thread,            /* Thread function.     */
-                     this);                     /* Thread parameter.    */
 #endif
+
+#ifndef HAL_NO_RCIN_THREAD
     // setup the RCIN thread - this will call tasks at 1kHz
     _rcin_thread_ctx = chThdCreateStatic(_rcin_thread_wa,
                      sizeof(_rcin_thread_wa),
                      APM_RCIN_PRIORITY,        /* Initial priority.    */
                      _rcin_thread,             /* Thread function.     */
                      this);                     /* Thread parameter.    */
-
+#endif
+#ifndef HAL_USE_EMPTY_IO
     // the IO thread runs at lower priority
     _io_thread_ctx = chThdCreateStatic(_io_thread_wa,
                      sizeof(_io_thread_wa),
                      APM_IO_PRIORITY,        /* Initial priority.      */
                      _io_thread,             /* Thread function.       */
                      this);                  /* Thread parameter.      */
+#endif
 
+#ifndef HAL_USE_EMPTY_STORAGE
     // the storage thread runs at just above IO priority
     _storage_thread_ctx = chThdCreateStatic(_storage_thread_wa,
                      sizeof(_storage_thread_wa),
                      APM_STORAGE_PRIORITY,        /* Initial priority.      */
                      _storage_thread,             /* Thread function.       */
                      this);                  /* Thread parameter.      */
+#endif
+
 }
 
 
@@ -219,16 +229,25 @@ void Scheduler::reboot(bool hold_in_bootloader)
 {
     // disarm motors to ensure they are off during a bootloader upload
     hal.rcout->force_safety_on();
-    hal.rcout->force_safety_no_wait();
 
+#if HAL_WITH_IO_MCU
+    if (AP_BoardConfig::io_enabled()) {
+        iomcu.shutdown();
+    }
+#endif
+
+#ifndef NO_DATAFLASH
     //stop logging
     DataFlash_Class::instance()->StopLogging();
 
     // stop sdcard driver, if active
     sdcard_stop();
+#endif
 
+#if defined(HAL_USE_RTC) && HAL_USE_RTC
     // setup RTC for fast reboot
     set_fast_reboot(hold_in_bootloader?RTC_BOOT_HOLD:RTC_BOOT_FAST);
+#endif
 
     // disable all interrupt sources
     port_disable();
@@ -260,7 +279,7 @@ void Scheduler::_run_timers()
         _failsafe();
     }
 
-#if HAL_USE_ADC == TRUE
+#if HAL_USE_ADC == TRUE && !defined(HAL_DISABLE_ADC_DRIVER)
     // process analog input
     ((AnalogIn *)hal.analogin)->_timer_tick();
 #endif
@@ -286,24 +305,6 @@ void Scheduler::_timer_thread(void *arg)
         hal.rcout->timer_tick();
     }
 }
-#if HAL_WITH_UAVCAN
-void Scheduler::_uavcan_thread(void *arg)
-{
-    Scheduler *sched = (Scheduler *)arg;
-    chRegSetThreadName("apm_uavcan");
-    while (!sched->_hal_initialized) {
-        sched->delay_microseconds(20000);
-    }
-    while (true) {
-        sched->delay_microseconds(300);
-        for (int i = 0; i < MAX_NUMBER_OF_CAN_INTERFACES; i++) {
-            if (AP_UAVCAN::get_uavcan(i) != nullptr) {
-                CANManager::from(hal.can_mgr[i])->_timer_tick();
-            }
-        }
-    }
-}
-#endif
 
 void Scheduler::_rcin_thread(void *arg)
 {
@@ -438,6 +439,7 @@ bool Scheduler::thread_create(AP_HAL::MemberProc proc, const char *name, uint32_
         { PRIORITY_IO, APM_IO_PRIORITY},
         { PRIORITY_UART, APM_UART_PRIORITY},
         { PRIORITY_STORAGE, APM_STORAGE_PRIORITY},
+        { PRIORITY_SCRIPTING, APM_SCRIPTING_PRIORITY},
     };
     for (uint8_t i=0; i<ARRAY_SIZE(priority_map); i++) {
         if (priority_map[i].base == base) {

@@ -168,6 +168,9 @@ void AP_MotorsUGV::setup_servo_output()
         SRV_Channel::Aux_servo_function_t function = SRV_Channels::get_motor_function(i);
         SRV_Channels::set_angle(function, 100);
     }
+
+    // mainsail range from 0 to 100
+    SRV_Channels::set_range(SRV_Channel::k_mainsail_sheet, 100);
 }
 
 // config for frames with vectored motors and custom motor configurations
@@ -194,10 +197,10 @@ void AP_MotorsUGV::setup_motors()
 
     case FRAME_TYPE_OMNIX:
         _motors_num = 4,
-        add_motor(0, -1.0f, 1.0f, 1.0f);
-        add_motor(1, -1.0f, -1.0f, -1.0f);
-        add_motor(2, 1.0f, -1.0f, 1.0f);
-        add_motor(3, 1.0f, 1.0f, -1.0f);
+        add_motor(0, 1.0f, -1.0f, -1.0f);
+        add_motor(1, 1.0f, -1.0f, 1.0f);
+        add_motor(2, 1.0f, 1.0f, -1.0f);
+        add_motor(3, 1.0f, 1.0f, 1.0f);
         break;
 
     case FRAME_TYPE_OMNIPLUS:
@@ -278,6 +281,12 @@ void AP_MotorsUGV::set_lateral(float lateral)
     _lateral = constrain_float(lateral, -100.0f, 100.0f);
 }
 
+// set mainsail input as a value from 0 to 100
+void AP_MotorsUGV::set_mainsail(float mainsail)
+{
+    _mainsail = constrain_float(mainsail, 0.0f, 100.0f);
+}
+
 // get slew limited throttle
 // used by manual mode to avoid bad steering behaviour during transitions from forward to reverse
 // same as private slew_limit_throttle method (see below) but does not update throttle state
@@ -303,6 +312,12 @@ bool AP_MotorsUGV::have_skid_steering() const
     return false;
 }
 
+// true if the vehicle has a mainsail
+bool AP_MotorsUGV::has_sail() const
+{
+    return SRV_Channels::function_assigned(SRV_Channel::k_mainsail_sheet);
+}
+
 void AP_MotorsUGV::output(bool armed, float ground_speed, float dt)
 {
     // soft-armed overrides passed in armed status
@@ -321,10 +336,13 @@ void AP_MotorsUGV::output(bool armed, float ground_speed, float dt)
     output_regular(armed, ground_speed, _steering, _throttle);
 
     // output for skid steering style frames
-    output_skid_steering(armed, _steering, _throttle);
+    output_skid_steering(armed, _steering, _throttle, dt);
 
     // output for frames with vectored and custom motor configurations
     output_custom_config(armed, _steering, _throttle, _lateral);
+
+    // output to mainsail
+    output_mainsail();
 
     // send values to the PWM timers for output
     SRV_Channels::calc_pwm();
@@ -338,7 +356,7 @@ void AP_MotorsUGV::output(bool armed, float ground_speed, float dt)
 bool AP_MotorsUGV::output_test_pct(motor_test_order motor_seq, float pct)
 {
     // check if the motor_seq is valid
-    if (motor_seq > MOTOR_TEST_THROTTLE_RIGHT) {
+    if (motor_seq >= MOTOR_TEST_LAST) {
         return false;
     }
     pct = constrain_float(pct, -100.0f, 100.0f);
@@ -380,7 +398,13 @@ bool AP_MotorsUGV::output_test_pct(motor_test_order motor_seq, float pct)
             }
             break;
         }
-        default:
+        case MOTOR_TEST_MAINSAIL: {
+            if (SRV_Channels::function_assigned(SRV_Channel::k_mainsail_sheet)) {
+                SRV_Channels::set_output_scaled(SRV_Channel::k_mainsail_sheet, pct);
+            }
+            break;
+        }
+        case MOTOR_TEST_LAST:
             return false;
     }
     SRV_Channels::calc_pwm();
@@ -434,6 +458,12 @@ bool AP_MotorsUGV::output_test_pwm(motor_test_order motor_seq, float pwm)
             }
             break;
         }
+        case MOTOR_TEST_MAINSAIL: {
+            if (SRV_Channels::function_assigned(SRV_Channel::k_mainsail_sheet)) {
+                SRV_Channels::set_output_pwm(SRV_Channel::k_mainsail_sheet, pwm);
+            }
+            break;
+        }
         default:
             return false;
     }
@@ -464,8 +494,8 @@ bool AP_MotorsUGV::pre_arm_check(bool report) const
         }
         return false;
     }
-    // check if only one of throttle or steering outputs has been configured
-    if (SRV_Channels::function_assigned(SRV_Channel::k_throttle) != SRV_Channels::function_assigned(SRV_Channel::k_steering)) {
+    // check if only one of throttle or steering outputs has been configured, if has a sail allow no throttle
+    if ((has_sail() || SRV_Channels::function_assigned(SRV_Channel::k_throttle)) != SRV_Channels::function_assigned(SRV_Channel::k_steering)) {
         if (report) {
             gcs().send_text(MAV_SEVERITY_CRITICAL, "PreArm: check steering and throttle config");
         }
@@ -582,7 +612,7 @@ void AP_MotorsUGV::output_regular(bool armed, float ground_speed, float steering
 }
 
 // output to skid steering channels
-void AP_MotorsUGV::output_skid_steering(bool armed, float steering, float throttle)
+void AP_MotorsUGV::output_skid_steering(bool armed, float steering, float throttle, float dt)
 {
     if (!have_skid_steering()) {
         return;
@@ -626,8 +656,8 @@ void AP_MotorsUGV::output_skid_steering(bool armed, float steering, float thrott
     const float motor_right = throttle_scaled - steering_scaled;
 
     // send pwm value to each motor
-    output_throttle(SRV_Channel::k_throttleLeft, 100.0f * motor_left);
-    output_throttle(SRV_Channel::k_throttleRight, 100.0f * motor_right);
+    output_throttle(SRV_Channel::k_throttleLeft, 100.0f * motor_left, dt);
+    output_throttle(SRV_Channel::k_throttleRight, 100.0f * motor_right, dt);
 }
 
 // output for custom configurations
@@ -680,7 +710,7 @@ void AP_MotorsUGV::output_custom_config(bool armed, float steering, float thrott
 }
 
 // output throttle value to main throttle channel, left throttle or right throttle.  throttle should be scaled from -100 to 100
-void AP_MotorsUGV::output_throttle(SRV_Channel::Aux_servo_function_t function, float throttle)
+void AP_MotorsUGV::output_throttle(SRV_Channel::Aux_servo_function_t function, float throttle, float dt)
 {
     // sanity check servo function
     if (function != SRV_Channel::k_throttle && function != SRV_Channel::k_throttleLeft && function != SRV_Channel::k_throttleRight && function != SRV_Channel::k_motor1 && function != SRV_Channel::k_motor2 && function != SRV_Channel::k_motor3 && function!= SRV_Channel::k_motor4) {
@@ -689,6 +719,9 @@ void AP_MotorsUGV::output_throttle(SRV_Channel::Aux_servo_function_t function, f
 
     // constrain and scale output
     throttle = get_scaled_throttle(throttle);
+
+    // apply rate control
+    throttle = get_rate_controlled_throttle(function, throttle, dt);
 
     // set relay if necessary
     if (_pwm_type == PWM_TYPE_BRUSHED_WITH_RELAY) {
@@ -743,6 +776,16 @@ void AP_MotorsUGV::output_throttle(SRV_Channel::Aux_servo_function_t function, f
     }
 }
 
+// output for sailboat's mainsail
+void AP_MotorsUGV::output_mainsail()
+{
+    if (!has_sail()) {
+        return;
+    }
+
+    SRV_Channels::set_output_scaled(SRV_Channel::k_mainsail_sheet, _mainsail);
+}
+
 // slew limit throttle for one iteration
 void AP_MotorsUGV::slew_limit_throttle(float dt)
 {
@@ -792,6 +835,28 @@ float AP_MotorsUGV::get_scaled_throttle(float throttle) const
     const float sign = (throttle < 0.0f) ? -1.0f : 1.0f;
     const float throttle_pct = constrain_float(throttle, -100.0f, 100.0f) / 100.0f;
     return 100.0f * sign * ((_thrust_curve_expo - 1.0f) + safe_sqrt((1.0f - _thrust_curve_expo) * (1.0f - _thrust_curve_expo) + 4.0f * _thrust_curve_expo * fabsf(throttle_pct))) / (2.0f * _thrust_curve_expo);
+}
+
+// use rate controller to achieve desired throttle
+float AP_MotorsUGV::get_rate_controlled_throttle(SRV_Channel::Aux_servo_function_t function, float throttle, float dt)
+{
+    // require non-zero dt
+    if (!is_positive(dt)) {
+        return throttle;
+    }
+
+    // attempt to rate control left throttle
+    if ((function == SRV_Channel::k_throttleLeft) && rover.get_wheel_rate_control().enabled(0)) {
+        return rover.get_wheel_rate_control().get_rate_controlled_throttle(0, throttle, dt);
+    }
+
+    // rate control right throttle
+    if ((function == SRV_Channel::k_throttleRight) && rover.get_wheel_rate_control().enabled(1)) {
+        return rover.get_wheel_rate_control().get_rate_controlled_throttle(1, throttle, dt);
+    }
+
+    // return throttle unchanged
+    return throttle;
 }
 
 // return true if motors are moving

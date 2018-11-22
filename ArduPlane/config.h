@@ -292,10 +292,6 @@
  # define USE_CURRENT_ALT FALSE
 #endif
 
-#ifndef INVERTED_FLIGHT_PWM
- # define INVERTED_FLIGHT_PWM 1750
-#endif
-
 #ifndef PX4IO_OVERRIDE_PWM
  # define PX4IO_OVERRIDE_PWM 1750
 #endif
@@ -384,4 +380,8 @@
 #else
  #define SOARING_ENABLED ENABLED
 #endif
+#endif
+
+#ifndef LANDING_GEAR_ENABLED
+ #define LANDING_GEAR_ENABLED !HAL_MINIMIZE_FEATURES
 #endif

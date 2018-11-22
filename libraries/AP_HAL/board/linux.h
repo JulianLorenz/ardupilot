@@ -75,6 +75,7 @@
  * 240x240 crop rescaled to 64x64 */
 #define HAL_FLOW_PX4_FOCAL_LENGTH_MILLIPX (2.21 / (3.6 * 2.0 * 240 / 64))
 #define HAL_RANGEFINDER_LIGHTWARE_I2C_BUS 0
+#define HAL_BATT_MONITOR_DEFAULT AP_BattMonitor_Params::BattMonitor_TYPE_BEBOP
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_DISCO
 #define HAL_BOARD_LOG_DIRECTORY "/data/ftp/internal_000/ardupilot/logs"
 #define HAL_BOARD_TERRAIN_DIRECTORY "/data/ftp/internal_000/ardupilot/terrain"
@@ -118,6 +119,7 @@
 #define HAL_RANGEFINDER_LIGHTWARE_I2C_BUS 0
 // the disco has challenges with its magnetic setup
 #define AP_COMPASS_OFFSETS_MAX_DEFAULT 2200
+#define HAL_BATT_MONITOR_DEFAULT AP_BattMonitor_Params::BattMonitor_TYPE_BEBOP
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
 #define HAL_GPIO_A_LED_PIN 0
 #define HAL_GPIO_B_LED_PIN 1
@@ -135,6 +137,7 @@
 #define HAL_COMPASS_HMC5843_I2C_BUS 1
 #define HAL_COMPASS_HMC5843_I2C_ADDR 0x1E
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO2
+#define HAL_HAVE_SERVO_VOLTAGE 1
 #define HAL_INS_DEFAULT HAL_INS_MPU9250_SPI
 #define HAL_INS_DEFAULT_ROTATION ROTATION_NONE
 #define HAL_INS_MPU9250_NAME "mpu9250"
@@ -146,11 +149,6 @@
 /* HMC5843 can be an external compass */
 #define HAL_COMPASS_HMC5843_I2C_BUS 1
 #define HAL_COMPASS_HMC5843_I2C_ADDR 0x1E
-#define HAL_GPIO_A_LED_PIN        16
-#define HAL_GPIO_B_LED_PIN        16
-#define HAL_GPIO_C_LED_PIN        16
-#define HAL_GPIO_LED_ON           LOW
-#define HAL_GPIO_LED_OFF          HIGH
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2
 #define HAL_INS_DEFAULT HAL_INS_MPU9250_SPI
 #define HAL_INS_DEFAULT_ROTATION ROTATION_YAW_270
@@ -204,7 +202,6 @@
 #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BLUE
 #define HAL_GPIO_A_LED_PIN 66
 #define HAL_GPIO_B_LED_PIN 67
-#define HAL_GPIO_C_LED_PIN 67
 #define HAL_GPIO_LED_ON    HIGH
 #define HAL_GPIO_LED_OFF   LOW
 #define HAL_INS_DEFAULT HAL_INS_MPU9250_I2C
@@ -361,6 +358,11 @@
 #define HAL_HAVE_BOARD_VOLTAGE 1
 #define HAL_HAVE_SAFETY_SWITCH 0
 
+
+#ifndef HAL_HAVE_SERVO_VOLTAGE
+#define HAL_HAVE_SERVO_VOLTAGE 0
+#endif
+
 #ifndef AP_STATEDIR
 #define HAL_BOARD_STATE_DIRECTORY "/var/lib/ardupilot"
 #else
@@ -395,3 +397,8 @@
 #ifndef HAL_LINUX_I2C_EXTERNAL_BUS_MASK
 #define HAL_LINUX_I2C_EXTERNAL_BUS_MASK 0xFFFF
 #endif
+
+#include <AP_HAL_Linux/Semaphores.h>
+#define HAL_Semaphore Linux::Semaphore
+#define HAL_Semaphore_Recursive Linux::Semaphore_Recursive
+

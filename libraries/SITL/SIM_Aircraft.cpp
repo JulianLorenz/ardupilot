@@ -438,6 +438,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
             fdm.quaternion.from_rotation_matrix(m);
         }
     }
+
     if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0) {
         set_speedup(sitl->speedup);
         last_speedup = sitl->speedup;

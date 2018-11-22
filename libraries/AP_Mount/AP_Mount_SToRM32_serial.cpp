@@ -123,8 +123,8 @@ void AP_Mount_SToRM32_serial::set_mode(enum MAV_MOUNT_MODE mode)
     _state._mode = mode;
 }
 
-// status_msg - called to allow mounts to send their status to GCS using the MOUNT_STATUS message
-void AP_Mount_SToRM32_serial::status_msg(mavlink_channel_t chan)
+// send_mount_status - called to allow mounts to send their status to GCS using the MOUNT_STATUS message
+void AP_Mount_SToRM32_serial::send_mount_status(mavlink_channel_t chan)
 {
     // return target angles as gimbal's actual attitude.
     mavlink_msg_mount_status_send(chan, 0, 0, _current_angle.y, _current_angle.x, _current_angle.z);
@@ -268,11 +268,6 @@ void AP_Mount_SToRM32_serial::parse_reply() {
             _current_angle.x = _buffer.data.imu1_roll;
             _current_angle.y = _buffer.data.imu1_pitch;
             _current_angle.z = _buffer.data.imu1_yaw;
-            break;
-        case ReplyType_ACK:
-            crc = crc_calculate(&_buffer[1],
-                                sizeof(SToRM32_reply_ack_struct) - 3);
-            crc_ok = crc == _buffer.ack.crc;
             break;
         default:
             break;

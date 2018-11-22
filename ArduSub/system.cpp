@@ -27,6 +27,8 @@ void Sub::init_ardupilot()
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
 
+    init_capabilities();
+
     // load parameters from EEPROM
     load_parameters();
 
@@ -93,9 +95,6 @@ void Sub::init_ardupilot()
     init_rc_in();               // sets up rc channels from radio
     init_rc_out();              // sets up motors and output to escs
     init_joystick();            // joystick initialization
-
-    // initialise which outputs Servo and Relay events can use
-    ServoRelayEvents.set_channel_mask(~motors.get_motor_mask());
 
     relay.init();
 
@@ -205,9 +204,6 @@ void Sub::init_ardupilot()
     mainloop_failsafe_enable();
 
     ins.set_log_raw_bit(MASK_LOG_IMU_RAW);
-
-    // init vehicle capabilties
-    init_capabilities();
 
     // disable safety if requested
     BoardConfig.init_safety();    

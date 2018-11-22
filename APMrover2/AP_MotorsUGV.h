@@ -23,6 +23,8 @@ public:
         MOTOR_TEST_STEERING = 2,
         MOTOR_TEST_THROTTLE_LEFT = 3,
         MOTOR_TEST_THROTTLE_RIGHT = 4,
+        MOTOR_TEST_MAINSAIL = 5,
+        MOTOR_TEST_LAST
     };
 
     // supported custom motor configurations
@@ -70,6 +72,10 @@ public:
     // set lateral input as a value from -100 to +100
     void set_lateral(float lateral);
 
+    // set mainsail input as a value from 0 to 100
+    void set_mainsail(float mainsail);
+    float get_mainsail() const { return _mainsail; }
+
     // get slew limited throttle
     // used by manual mode to avoid bad steering behaviour during transitions from forward to reverse
     // same as private slew_limit_throttle method (see below) but does not update throttle state
@@ -80,6 +86,9 @@ public:
 
     // true if vehicle has vectored thrust (i.e. boat with motor on steering servo)
     bool have_vectored_thrust() const { return is_positive(_vector_throttle_base); }
+
+    // true if the vehicle has a mainsail
+    bool has_sail() const;
 
     // output to motors and steering servos
     // ground_speed should be the vehicle's speed over the surface in m/s
@@ -119,13 +128,17 @@ protected:
     void output_regular(bool armed, float ground_speed, float steering, float throttle);
 
     // output to skid steering channels
-    void output_skid_steering(bool armed, float steering, float throttle);
+    void output_skid_steering(bool armed, float steering, float throttle, float dt);
 
     // output for vectored and custom motors configuration
     void output_custom_config(bool armed, float steering, float throttle, float lateral);
 
     // output throttle (-100 ~ +100) to a throttle channel.  Sets relays if required
-    void output_throttle(SRV_Channel::Aux_servo_function_t function, float throttle);
+    // dt is the main loop time interval and is required when rate control is required
+    void output_throttle(SRV_Channel::Aux_servo_function_t function, float throttle, float dt = 0.0f);
+
+    // output for sailboat's mainsail in the range of 0 to 100
+    void output_mainsail();
 
     // slew limit throttle for one iteration
     void slew_limit_throttle(float dt);
@@ -135,6 +148,9 @@ protected:
 
     // scale a throttle using the _thrust_curve_expo parameter.  throttle should be in the range -100 to +100
     float get_scaled_throttle(float throttle) const;
+
+    // use rate controller to achieve desired throttle
+    float get_rate_controlled_throttle(SRV_Channel::Aux_servo_function_t function, float throttle, float dt);
 
     // external references
     AP_ServoRelayEvents &_relayEvents;
@@ -158,6 +174,7 @@ protected:
     float   _throttle_prev; // throttle input from previous iteration
     bool    _scale_steering = true; // true if we should scale steering by speed or angle
     float   _lateral;  // requested lateral input as a value from -100 to +100
+    float   _mainsail;  // requested mainsail input as a value from 0 to 100
 
     // custom config variables
     float   _throttle_factor[AP_MOTORS_NUM_MOTORS_MAX];

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <hwdef.h>
+#include <hal.h>
 
 #define HAL_BOARD_NAME "ChibiOS"
 #define HAL_CPU_CLASS HAL_CPU_CLASS_150
@@ -20,6 +21,10 @@
 #define HAL_HAVE_BOARD_VOLTAGE 0
 #endif
 
+#ifndef HAL_HAVE_SERVO_VOLTAGE
+#define HAL_HAVE_SERVO_VOLTAGE 0
+#endif
+
 #ifdef HAL_GPIO_PIN_SAFETY_IN
 #define HAL_HAVE_SAFETY_SWITCH 1
 #endif
@@ -37,6 +42,11 @@
 #ifndef HAL_WITH_RAMTRON
 #define HAL_WITH_RAMTRON 0
 #endif
+
+// allow for static semaphores
+#include <AP_HAL_ChibiOS/Semaphores.h>
+#define HAL_Semaphore ChibiOS::Semaphore
+#define HAL_Semaphore_Recursive ChibiOS::Semaphore_Recursive
 
 /* string names for well known SPI devices */
 #define HAL_BARO_MS5611_NAME "ms5611"

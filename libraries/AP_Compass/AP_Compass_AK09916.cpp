@@ -48,15 +48,14 @@ extern const AP_HAL::HAL &hal;
 /*
   probe for AK09916 directly on I2C
  */
-AP_Compass_Backend *AP_Compass_AK09916::probe(Compass &compass,
-                                              AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev,
+AP_Compass_Backend *AP_Compass_AK09916::probe(AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev,
                                               bool force_external,
                                               enum Rotation rotation)
 {
     if (!dev) {
         return nullptr;
     }
-    AP_Compass_AK09916 *sensor = new AP_Compass_AK09916(compass, std::move(dev), nullptr,
+    AP_Compass_AK09916 *sensor = new AP_Compass_AK09916(std::move(dev), nullptr,
                                                         force_external,
                                                         rotation, AK09916_I2C);
     if (!sensor || !sensor->init()) {
@@ -71,8 +70,7 @@ AP_Compass_Backend *AP_Compass_AK09916::probe(Compass &compass,
 /*
   probe for AK09916 connected via an ICM20948
  */
-AP_Compass_Backend *AP_Compass_AK09916::probe_ICM20948(Compass &compass,
-                                                       AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev,
+AP_Compass_Backend *AP_Compass_AK09916::probe_ICM20948(AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev,
                                                        AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev_icm,
                                                        bool force_external,
                                                        enum Rotation rotation)
@@ -80,7 +78,7 @@ AP_Compass_Backend *AP_Compass_AK09916::probe_ICM20948(Compass &compass,
     if (!dev || !dev_icm) {
         return nullptr;
     }
-    AP_Compass_AK09916 *sensor = new AP_Compass_AK09916(compass, std::move(dev), std::move(dev_icm),
+    AP_Compass_AK09916 *sensor = new AP_Compass_AK09916(std::move(dev), std::move(dev_icm),
                                                         force_external,
                                                         rotation, AK09916_ICM20948_I2C);
     if (!sensor || !sensor->init()) {
@@ -91,14 +89,12 @@ AP_Compass_Backend *AP_Compass_AK09916::probe_ICM20948(Compass &compass,
     return sensor;
 }
 
-AP_Compass_AK09916::AP_Compass_AK09916(Compass &compass,
-                                       AP_HAL::OwnPtr<AP_HAL::Device> _dev,
+AP_Compass_AK09916::AP_Compass_AK09916(AP_HAL::OwnPtr<AP_HAL::Device> _dev,
                                        AP_HAL::OwnPtr<AP_HAL::Device> _dev_icm,
                                        bool _force_external,
                                        enum Rotation _rotation,
                                        enum bus_type _bus_type)
-    : AP_Compass_Backend(compass)
-    , bus_type(_bus_type)
+    : bus_type(_bus_type)
     , dev(std::move(_dev))
     , dev_icm(std::move(_dev_icm))
     , force_external(_force_external)
@@ -232,20 +228,7 @@ void AP_Compass_AK09916::timer()
 
     field(data.magx * range_scale, data.magy * range_scale, data.magz * range_scale);
 
-    /* rotate raw_field from sensor frame to body frame */
-    rotate_field(field, compass_instance);
-
-    /* publish raw_field (uncorrected point sample) for calibration use */
-    publish_raw_field(field, compass_instance);
-
-    /* correct raw_field for known errors */
-    correct_field(field, compass_instance);
-
-    if (_sem->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        accum += field;
-        accum_count++;
-        _sem->give();
-    }
+    accumulate_sample(field, compass_instance);
 
 check_registers:
     dev->check_next_register();
@@ -253,20 +236,5 @@ check_registers:
 
 void AP_Compass_AK09916::read()
 {
-    if (!_sem->take_nonblocking()) {
-        return;
-    }
-    if (accum_count == 0) {
-        _sem->give();
-        return;
-    }
-
-    accum /= accum_count;
-
-    publish_filtered_field(accum, compass_instance);
-
-    accum.zero();
-    accum_count = 0;
-    
-    _sem->give();
+    drain_accumulated_samples(compass_instance);
 }

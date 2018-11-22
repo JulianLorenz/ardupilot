@@ -39,6 +39,8 @@ AP_BLHeli *SRV_Channels::blheli_ptr;
 #endif
 
 uint16_t SRV_Channels::disabled_mask;
+uint16_t SRV_Channels::digital_mask;
+uint16_t SRV_Channels::reversible_mask;
 
 bool SRV_Channels::disabled_passthrough;
 bool SRV_Channels::initialised;
@@ -138,7 +140,7 @@ const AP_Param::GroupInfo SRV_Channels::var_info[] = {
     // @Path: ../AP_BLHeli/AP_BLHeli.cpp
     AP_SUBGROUPINFO(blheli, "_BLH_",  21, SRV_Channels, AP_BLHeli),
 #endif
-    
+
     AP_GROUPEND
 };
 
@@ -178,17 +180,12 @@ void SRV_Channels::save_trim(void)
     trimmed_mask = 0;
 }
 
-void SRV_Channels::output_trim_all(void)
-{
-    for (uint8_t i=0; i<NUM_SERVO_CHANNELS; i++) {
-        channels[i].set_output_pwm(channels[i].servo_trim);
-    }
-}
-
-void SRV_Channels::setup_failsafe_trim_all(void)
+void SRV_Channels::setup_failsafe_trim_all_non_motors(void)
 {
     for (uint8_t i = 0; i < NUM_SERVO_CHANNELS; i++) {
-        hal.rcout->set_failsafe_pwm(1U<<channels[i].ch_num, channels[i].servo_trim);
+        if (!SRV_Channel::is_motor(channels[i].get_function())) {
+            hal.rcout->set_failsafe_pwm(1U<<channels[i].ch_num, channels[i].servo_trim);
+        }
     }
 }
 
@@ -224,7 +221,7 @@ void SRV_Channels::cork()
 void SRV_Channels::push()
 {
     hal.rcout->push();
-    
+
     // give volz library a chance to update
     volz_ptr->update();
 
@@ -238,8 +235,8 @@ void SRV_Channels::push()
 
 #if HAL_WITH_UAVCAN
     // push outputs to UAVCAN
-    uint8_t can_num_ifaces = AP_BoardConfig_CAN::get_can_num_ifaces();
-    for (uint8_t i = 0; i < MAX_NUMBER_OF_CAN_DRIVERS && i < can_num_ifaces; i++) {
+    uint8_t can_num_drivers = AP::can().get_num_drivers();
+    for (uint8_t i = 0; i < can_num_drivers; i++) {
         AP_UAVCAN *ap_uavcan = AP_UAVCAN::get_uavcan(i);
         if (ap_uavcan == nullptr) {
             continue;

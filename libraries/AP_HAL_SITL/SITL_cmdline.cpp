@@ -18,6 +18,7 @@
 #include <SITL/SIM_QuadPlane.h>
 #include <SITL/SIM_Rover.h>
 #include <SITL/SIM_BalanceBot.h>
+#include <SITL/SIM_Sailboat.h>
 #include <SITL/SIM_CRRCSim.h>
 #include <SITL/SIM_Gazebo.h>
 #include <SITL/SIM_last_letter.h>
@@ -100,6 +101,7 @@ static const struct {
     { "coaxcopter",         SingleCopter::create },
     { "rover",              SimRover::create },
     { "balancebot",         BalanceBot::create },
+    { "sailboat",           Sailboat::create },
     { "crrcsim",            CRRCSim::create },
     { "jsbsim",             JSBSim::create },
     { "flightaxis",         FlightAxis::create },
@@ -232,6 +234,9 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             break;
         case 's':
             speedup = strtof(gopt.optarg, nullptr);
+            char speedup_string[18];
+            snprintf(speedup_string, sizeof(speedup_string), "SIM_SPEEDUP=%s", gopt.optarg);
+            _set_param_default(speedup_string);
             break;
         case 'r':
             _framerate = (unsigned)atoi(gopt.optarg);

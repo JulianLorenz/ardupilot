@@ -30,7 +30,7 @@ public:
     static bool detect();
 
     // update state
-    void update(void);
+    void update(void) override;
 
 protected:
 
@@ -41,7 +41,6 @@ protected:
 private:
     int _fd;
     uint64_t _last_timestamp;
-    uint64_t _last_pulse_time_ms;
     uint32_t _disable_time_ms;
     uint32_t _good_sample_count;
     float _last_sample_distance_cm;

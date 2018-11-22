@@ -188,12 +188,6 @@ AP_HAL::DigitalSource* GPIO_Sysfs::channel(uint16_t vpin)
     return new DigitalSource_Sysfs(pin, value_fd);
 }
 
-bool GPIO_Sysfs::attach_interrupt(uint8_t interrupt_num, AP_HAL::Proc p,
-                                       uint8_t mode)
-{
-    return false;
-}
-
 bool GPIO_Sysfs::usb_connected(void)
 {
     return false;

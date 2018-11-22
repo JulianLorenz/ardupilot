@@ -50,7 +50,7 @@ public:
     static bool detect(AP_SerialManager &serial_manager, uint8_t serial_instance);
 
     // update state
-    void update(void);
+    void update(void) override;
 
 protected:
 
@@ -69,7 +69,6 @@ private:
     LeddarOne_Status parse_response(uint8_t &number_detections);
 
     AP_HAL::UARTDriver *uart = nullptr;
-    uint32_t last_reading_ms;
     uint32_t last_sending_request_ms;
     uint32_t last_available_ms;
 

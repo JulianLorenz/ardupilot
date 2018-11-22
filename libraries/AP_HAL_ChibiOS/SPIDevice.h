@@ -17,11 +17,13 @@
 #include <inttypes.h>
 #include <AP_HAL/HAL.h>
 #include <AP_HAL/SPIDevice.h>
+#include "AP_HAL_ChibiOS.h"
+
+#if HAL_USE_SPI == TRUE
+
 #include "Semaphores.h"
 #include "Scheduler.h"
 #include "Device.h"
-
-#if HAL_USE_SPI == TRUE
 
 namespace ChibiOS {
 
@@ -132,7 +134,7 @@ public:
         return static_cast<SPIDeviceManager*>(spi_mgr);
     }
 
-    AP_HAL::OwnPtr<AP_HAL::SPIDevice> get_device(const char *name);
+    AP_HAL::OwnPtr<AP_HAL::SPIDevice> get_device(const char *name) override;
 
 private:
     static SPIDesc device_table[];

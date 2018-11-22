@@ -227,7 +227,7 @@ void Copter::ModeRTL::loiterathome_run()
     if ((millis() - _loiter_start_time) >= (uint32_t)g.rtl_loiter_time.get()) {
         if (auto_yaw.mode() == AUTO_YAW_RESETTOARMEDYAW) {
             // check if heading is within 2 degrees of heading when vehicle was armed
-            if (labs(wrap_180_cd(ahrs.yaw_sensor-copter.initial_armed_bearing)) <= 200) {
+            if (fabsf(wrap_180_cd(ahrs.yaw_sensor-copter.initial_armed_bearing)) <= 200) {
                 _state_complete = true;
             }
         } else {
@@ -265,6 +265,7 @@ void Copter::ModeRTL::descent_run()
     if (!motors->armed() || !ap.auto_armed || !motors->get_interlock()) {
         zero_throttle_and_relax_ac();
         // set target to current position
+        loiter_nav->clear_pilot_desired_acceleration();
         loiter_nav->init_target();
         return;
     }
@@ -288,6 +289,9 @@ void Copter::ModeRTL::descent_run()
 
             // record if pilot has overriden roll or pitch
             if (!is_zero(target_roll) || !is_zero(target_pitch)) {
+                if (!ap.land_repo_active) {
+                    copter.Log_Write_Event(DATA_LAND_REPO_ACTIVE);
+                }
                 ap.land_repo_active = true;
             }
         }
@@ -303,7 +307,7 @@ void Copter::ModeRTL::descent_run()
     loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch, G_Dt);
 
     // run loiter controller
-    loiter_nav->update(ekfGndSpdLimit, ekfNavVelGainScaler);
+    loiter_nav->update();
 
     // call z-axis position controller
     pos_control->set_alt_target_with_slew(rtl_path.descent_target.alt, G_Dt);
@@ -356,6 +360,7 @@ void Copter::ModeRTL::land_run(bool disarm_on_land)
     if (!motors->armed() || !ap.auto_armed || ap.land_complete || !motors->get_interlock()) {
         zero_throttle_and_relax_ac();
         // set target to current position
+        loiter_nav->clear_pilot_desired_acceleration();
         loiter_nav->init_target();
 
         // disarm when the landing detector says we've landed

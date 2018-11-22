@@ -150,20 +150,18 @@ extern const AP_HAL::HAL &hal;
 #define LSM303D_MAG_DEFAULT_RANGE_GA          2
 #define LSM303D_MAG_DEFAULT_RATE            100
 
-AP_Compass_LSM303D::AP_Compass_LSM303D(Compass &compass, AP_HAL::OwnPtr<AP_HAL::Device> dev)
-    : AP_Compass_Backend(compass)
-    , _dev(std::move(dev))
+AP_Compass_LSM303D::AP_Compass_LSM303D(AP_HAL::OwnPtr<AP_HAL::Device> dev)
+    : _dev(std::move(dev))
 {
 }
 
-AP_Compass_Backend *AP_Compass_LSM303D::probe(Compass &compass,
-                                              AP_HAL::OwnPtr<AP_HAL::Device> dev,
+AP_Compass_Backend *AP_Compass_LSM303D::probe(AP_HAL::OwnPtr<AP_HAL::Device> dev,
                                               enum Rotation rotation)
 {
     if (!dev) {
         return nullptr;
     }
-    AP_Compass_LSM303D *sensor = new AP_Compass_LSM303D(compass, std::move(dev));
+    AP_Compass_LSM303D *sensor = new AP_Compass_LSM303D(std::move(dev));
     if (!sensor || !sensor->init(rotation)) {
         delete sensor;
         return nullptr;
@@ -343,28 +341,7 @@ void AP_Compass_LSM303D::_update()
 
     Vector3f raw_field = Vector3f(_mag_x, _mag_y, _mag_z) * _mag_range_scale;
 
-    // rotate raw_field from sensor frame to body frame
-    rotate_field(raw_field, _compass_instance);
-
-    // publish raw_field (uncorrected point sample) for calibration use
-    publish_raw_field(raw_field, _compass_instance);
-
-    // correct raw_field for known errors
-    correct_field(raw_field, _compass_instance);
-
-    if (_sem->take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
-        _mag_x_accum += raw_field.x;
-        _mag_y_accum += raw_field.y;
-        _mag_z_accum += raw_field.z;
-        _accum_count++;
-        if (_accum_count == 10) {
-            _mag_x_accum /= 2;
-            _mag_y_accum /= 2;
-            _mag_z_accum /= 2;
-            _accum_count = 5;
-        }
-        _sem->give();
-    }
+    accumulate_sample(raw_field, _compass_instance, 10);
 }
 
 // Read Sensor data
@@ -374,25 +351,7 @@ void AP_Compass_LSM303D::read()
         return;
     }
 
-    if (!_sem->take_nonblocking()) {
-        return;
-    }
-    
-    if (_accum_count == 0) {
-        /* We're not ready to publish*/
-        _sem->give();
-        return;
-    }
-
-    Vector3f field(_mag_x_accum, _mag_y_accum, _mag_z_accum);
-    field /= _accum_count;
-
-    _accum_count = 0;
-    _mag_x_accum = _mag_y_accum = _mag_z_accum = 0;
-
-    _sem->give();    
-
-    publish_filtered_field(field, _compass_instance);
+    drain_accumulated_samples(_compass_instance);
 }
 
 void AP_Compass_LSM303D::_disable_i2c()

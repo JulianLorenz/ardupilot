@@ -52,11 +52,6 @@ public:
     /*
      * Currently this function always returns false.
      */
-    bool attach_interrupt(uint8_t interrupt_num, AP_HAL::Proc p, uint8_t mode) override;
-
-    /*
-     * Currently this function always returns false.
-     */
     bool usb_connected() override;
 
 protected:

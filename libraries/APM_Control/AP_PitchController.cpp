@@ -38,7 +38,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 	// @Range: 0.1 3.0
 	// @Increment: 0.1
 	// @User: User
-	AP_GROUPINFO("P",        1, AP_PitchController, gains.P,          0.6f),
+	AP_GROUPINFO("P",        1, AP_PitchController, gains.P,          1.0f),
 
 	// @Param: D
 	// @DisplayName: Damping Gain
@@ -46,7 +46,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 	// @Range: 0 0.1
 	// @Increment: 0.01
 	// @User: User
-	AP_GROUPINFO("D",        2, AP_PitchController, gains.D,        0.02f),
+    AP_GROUPINFO("D",        2, AP_PitchController, gains.D,        0.04f),
 
 	// @Param: I
 	// @DisplayName: Integrator Gain
@@ -54,7 +54,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 	// @Range: 0 0.5
 	// @Increment: 0.05
 	// @User: User
-	AP_GROUPINFO("I",        3, AP_PitchController, gains.I,        0.15f),
+	AP_GROUPINFO("I",        3, AP_PitchController, gains.I,        0.3f),
 
 	// @Param: RMAX_UP
 	// @DisplayName: Pitch up max rate
@@ -211,7 +211,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
       beyond the configured roll limit, reducing to zero at 90
       degrees
     */
-    float roll_wrapped = fabsf(_ahrs.roll_sensor);
+    float roll_wrapped = labs(_ahrs.roll_sensor);
     if (roll_wrapped > 9000) {
         roll_wrapped = 18000 - roll_wrapped;
     }

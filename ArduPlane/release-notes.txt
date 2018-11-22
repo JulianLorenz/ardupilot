@@ -1,3 +1,217 @@
+Release 3.9.2beta3, 20th September 2018
+---------------------------------------
+
+The is the third beta release of the plane 3.9.2 stable release. It
+contains a small number of fixes:
+
+ - fixed clearing of loiter pilot acceleration targets for quadplanes
+
+ - fixed handling of duplicate rotations for COMPASS_AUTO_ROT
+
+I expect this will be the last beta release before 3.9.2
+
+Happy flying!
+
+Release 3.9.2beta2, 15th September 2018
+---------------------------------------
+
+The is the second beta release of the plane 3.9.2 stable release. It
+contains a number of important bug fixes.
+
+ - implement failsafe PWM in IOMCU, for AFS failsafe when FMU dies
+
+ - handle reversed channels correctly in AFS failsafe
+
+ - fixed twin motor plane handling in AFS failsafe
+
+ - fixed a bug in Q_ASSIST_SPEED support for tiltrotors that could
+   lead to zero throttle when assistance triggers.
+
+ - lower default PTCH2SRV_D to 0.04 after reports of oscillation on
+   small flying wings
+
+ - added speed scaler reduction in Q modes when at low airspeed
+
+ - fixed synthetic airspeed estimation to be along +ve X axis
+
+ - fixed relaxing of VTOL attitude controller on transition (thanks to
+   Leonard Hall)
+
+ - default COMPASS_AUTO_ROT to 2 on all boards
+
+ - fixed UART speed rounding bug that caused failure at high board
+   rates
+
+ - fixed a short glitch in position control on quadplane transition
+   (many thanks to Leonard for lots of help with this)
+
+ - fixed RSSI voltage from IOMCU
+
+Thanks to everyone who has contributed, and please report all test
+results with this beta.
+
+Happy flying!
+
+Release 3.9.2beta1, 12th September 2018
+---------------------------------------
+
+The is the first beta release of the plane 3.9.2 stable release. It
+contains a number of important bug fixes.
+
+ - fixed a quadplane bug that could cause large attitude instability
+   during takeoff if the aircraft does not have enough power to climb
+   to its target height. Thanks to Leonard for the fix.
+
+ - fixed a bug that prevented dead-reckoning working on GPS loss.
+
+ - fixed an ADC bug that prevented some boards from using all of their
+   analog input. Thanks to vierfuffzig for reporting!
+
+ - fixed a bug in advanced failsafe support that left RC input to
+   throttle active after termination. Thanks to Michael Thomas for
+   finding this bug.
+
+ - fixed use of OLED displays on the first I2C bus on systems with two
+   I2C buses
+
+Thanks to everyone who has contributed, and please report all test
+results with this beta.
+
+Happy flying!
+
+
+Release 3.9.1, 31st August 2018
+-------------------------------
+
+The ArduPilot dev team are delighted to announce a new stable plane
+release. This is a minor release, but does include some important
+fixes.
+
+The only change over the 3.9.1beta3 release is an increase in the USB
+buffer size to give faster log download over USB.
+
+Other important changes from the 3.9.1beta releases include:
+
+ - updated to default values for some tuning parameters
+
+ - fixed a critical safety issue found by Oliver Volkmann, and fixed
+   by Michael du Breuil. The problem could lead to quadplane motors
+   starting on reboot
+
+ - fixed a bug where RC failsafe could lead rudder input stuck at the
+   last rudder input value in some modes. Thanks to Michael du Breuil
+   for the fix
+
+ - improved DShot and BLHeli-passthrough support, fixing errors
+   reported by BLHeli32 ESCs and making using BLHeliSuite32 much more
+   reliable
+
+ - new tonealarm system, bringing the tones produced under ChibiOS and
+   Linux HALs in line with tones produced under the HAL_PX4 HAL.
+
+ - added a new LED driver for the NCP5623 LED
+
+ - fixed delay caused by parameter writes in AP_Stats
+
+ - fixed default RSSI input pin on some boards
+
+ - fixed the incorrect display of "no io thread heartbeat" message
+
+ - fixed microSD support on some boards due to running out of DMA
+   capable memory
+
+Many thanks to everyone who has been testing the beta releases.
+
+Happy flying!
+
+
+Release 3.9.1beta3, 23rd August 2018
+------------------------------------
+
+This is the third beta for the 3.9.1 release, which is a minor
+update over 3.9.0. This release includes the following changes:
+
+ - fixed a critical safety issue found by Oliver Volkmann, and fixed
+   by Michael du Breuil. The problem could lead to quadplane motors
+   starting on reboot
+
+ - fixed a bug where RC failsafe could lead rudder input stuck at the
+   last rudder input value in some modes. Thanks to Michael du Breuil
+   for the fix
+
+ - raised OSD thread stack size to 1024 (needed for new OSD items)
+
+Thanks to everyone who is testing the 3.9.1beta series!
+
+Release 3.9.1beta2, 17th August 2018
+------------------------------------
+
+This is a the second beta for the 3.9.1 release, which is a minor
+update over 3.9.0. This release includes the following changes:
+
+ - increased default buffer sizes in dataflash for some boards
+
+ - fixed a bug with small dataflash buffers
+
+ - updated OSD with new items: hdop, temperature, waypoint, xtrack,
+   flight distance, flighttime, efficiency (thanks to Hwurzburg,
+   vierfuffzig and sh83).
+
+ - reduced memory usage in serial buffers
+
+ - adjusted some default parameters to give a better first flight
+   experience for more users.
+
+The default parameter changes are:
+
+ - RLL2SRV_P from 0.6 to 1.0
+ - RLL2SRV_I from 0.1 to 0.3
+ - RLL2SRV_D from 0.02 to 0.08
+ - PTCH2SRV_P from 0.6 to 1.0
+ - PTCH2SRV_I from 0.1 to 0.3
+ - PTCH2SRV_D from 0.02 to 0.08
+ - TECS_PITCH_MAX from 0 to 15
+ - NAVL1_PERIOD from 20 to 17
+
+The PID parameter changes won't affect anyone who has done some
+tuning, but will make the first flight experience for a new user be a
+lot better for nearly all aircraft. Paul and I decided on the values
+based on experience with users flight logs, plus the experience users
+have had with AUTOTUNE mode.
+
+Please report testing results!
+
+Happy flying
+
+Release 3.9.1beta1, 15th August 2018
+------------------------------------
+
+This is a the first beta for the 3.9.1 release, which is a minor
+update over 3.9.0. This release includes the following changes:
+
+ - improved DShot and BLHeli-passthrough support, fixing errors
+   reported by BLHeli32 ESCs and making using BLHeliSuite32 much more
+   reliable
+
+ - new tonealarm system, bringing the tones produced under ChibiOS and
+   Linux HALs in line with tones produced under the HAL_PX4 HAL.
+
+ - added a new LED driver for the NCP5623 LED
+
+ - fixed delay caused by parameter writes in AP_Stats
+
+ - fixed default RSSI input pin on some boards
+
+ - fixed the incorrect display of "no io thread heartbeat" message
+
+ - fixed microSD support on some boards due to running out of DMA
+   capable memory
+
+Given the changes are quite small, I hope to make this a fairly short
+beta cycle. Please test it and report both success and failure.
+
+Happy flying!
+
 Release 3.9.0, 6th August 2018
 ------------------------------
 

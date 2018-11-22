@@ -27,6 +27,7 @@ void Plane::init_ardupilot()
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
 
+    init_capabilities();
 
     //
     // Check the EEPROM format version before loading any parameters from EEPROM
@@ -95,9 +96,6 @@ void Plane::init_ardupilot()
 
     init_rc_out_main();
     
-    // allow servo set on all channels except first 4
-    ServoRelayEvents.set_channel_mask(0xFFF0);
-
     // keep a record of how many resets have happened. This can be
     // used to detect in-flight resets
     g.num_resets.set_and_save(g.num_resets+1);
@@ -172,6 +170,13 @@ void Plane::init_ardupilot()
     camera_mount.init(serial_manager);
 #endif
 
+#if LANDING_GEAR_ENABLED == ENABLED
+    // initialise landing gear position
+    g2.landing_gear.init();
+    gear.last_auto_cmd = -1;
+    gear.last_cmd = -1;
+#endif
+
 #if FENCE_TRIGGERED_PIN > 0
     hal.gpio->pinMode(FENCE_TRIGGERED_PIN, HAL_GPIO_OUTPUT);
     hal.gpio->write(FENCE_TRIGGERED_PIN, 0);
@@ -182,8 +187,6 @@ void Plane::init_ardupilot()
      *  the RC library being initialised.
      */
     hal.scheduler->register_timer_failsafe(failsafe_check_static, 1000);
-
-    init_capabilities();
 
     quadplane.setup();
 
@@ -207,7 +210,7 @@ void Plane::init_ardupilot()
     // initialise sensor
 #if OPTFLOW == ENABLED
     if (optflow.enabled()) {
-        optflow.init();
+        optflow.init(-1);
     }
 #endif
 
@@ -253,6 +256,12 @@ void Plane::startup_ground(void)
         FUNCTOR_BIND(&plane, &Plane::Log_Write_Vehicle_Startup_Messages, void)
         );
 #endif
+
+#ifdef ENABLE_SCRIPTING
+    if (!g2.scripting.init()) {
+        gcs().send_text(MAV_SEVERITY_ERROR, "Scripting failed to start");
+    }
+#endif // ENABLE_SCRIPTING
 
     // reset last heartbeat time, so we don't trigger failsafe on slow
     // startup
@@ -724,7 +733,7 @@ int8_t Plane::throttle_percentage(void)
         return quadplane.throttle_percentage();
     }
     float throttle = SRV_Channels::get_output_scaled(SRV_Channel::k_throttle);
-    if (aparm.throttle_min >= 0) {
+    if (!have_reverse_thrust()) {
         return constrain_int16(throttle, 0, 100);
     }
     return constrain_int16(throttle, -100, 100);

@@ -17,10 +17,10 @@ public:
     static bool detect();
 
     // update state
-    void update(void);
+    void update(void) override;
 
     // Get update from mavlink
-    void handle_msg(mavlink_message_t *msg);
+    void handle_msg(mavlink_message_t *msg) override;
 
 protected:
 
@@ -30,7 +30,6 @@ protected:
 
 private:
     uint16_t distance_cm;
-    uint32_t last_update_ms;
 
     // start a reading
     static bool start_reading(void);

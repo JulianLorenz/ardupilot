@@ -2,6 +2,9 @@
 
 #include <GCS_MAVLink/GCS.h>
 
+// default sensors are present and healthy: gyro, accelerometer, barometer, rate_control, attitude_stabilization, yaw_position, altitude control, x/y position control, motor_control
+#define MAVLINK_SENSOR_PRESENT_DEFAULT (MAV_SYS_STATUS_SENSOR_3D_GYRO | MAV_SYS_STATUS_SENSOR_3D_ACCEL | MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE | MAV_SYS_STATUS_SENSOR_ANGULAR_RATE_CONTROL | MAV_SYS_STATUS_SENSOR_ATTITUDE_STABILIZATION | MAV_SYS_STATUS_SENSOR_YAW_POSITION | MAV_SYS_STATUS_SENSOR_MOTOR_OUTPUTS)
+
 class GCS_MAVLINK_Tracker : public GCS_MAVLINK
 {
 
@@ -14,10 +17,8 @@ protected:
     // as currently Tracker may brick XBees
     uint32_t telem_delay() const override { return 0; }
 
-    Compass *get_compass() const override;
     AP_Mission *get_mission() override { return nullptr; };
     AP_Rally *get_rally() const override { return nullptr; };
-    AP_Camera *get_camera() const override { return nullptr; };
 
     uint8_t sysid_my_gcs() const override;
 
@@ -26,7 +27,7 @@ protected:
     MAV_RESULT _handle_command_preflight_calibration_baro() override;
     MAV_RESULT handle_command_long_packet(const mavlink_command_long_t &packet) override;
 
-    int32_t global_position_int_relative_alt() const {
+    int32_t global_position_int_relative_alt() const override {
         return 0; // what if we have been picked up and carried somewhere?
     }
 

@@ -24,7 +24,11 @@
 #define RANGEFINDER_MAX_INSTANCES 2
 #define RANGEFINDER_GROUND_CLEARANCE_CM_DEFAULT 10
 #define RANGEFINDER_PREARM_ALT_MAX_CM           200
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#define RANGEFINDER_PREARM_REQUIRED_CHANGE_CM   0
+#else
 #define RANGEFINDER_PREARM_REQUIRED_CHANGE_CM   50
+#endif
 
 class AP_RangeFinder_Backend;
 
@@ -61,7 +65,9 @@ public:
         RangeFinder_TYPE_NMEA = 17,
         RangeFinder_TYPE_WASP = 18,
         RangeFinder_TYPE_BenewakeTF02 = 19,
-        RangeFinder_TYPE_BenewakeTFmini = 20
+        RangeFinder_TYPE_BenewakeTFmini = 20,
+        RangeFinder_TYPE_PLI2CV3HP = 21,
+        RangeFinder_TYPE_PWM = 22,
     };
 
     enum RangeFinder_Function {
@@ -80,14 +86,14 @@ public:
 
     // The RangeFinder_State structure is filled in by the backend driver
     struct RangeFinder_State {
-        uint16_t               distance_cm; // distance: in cm
-        uint16_t               voltage_mv;  // voltage in millivolts,
-                                            // if applicable, otherwise 0
-        enum RangeFinder_Status status;     // sensor status
-        uint8_t                range_valid_count;   // number of consecutive valid readings (maxes out at 10)
-        bool                   pre_arm_check;   // true if sensor has passed pre-arm checks
-        uint16_t               pre_arm_distance_min;    // min distance captured during pre-arm checks
-        uint16_t               pre_arm_distance_max;    // max distance captured during pre-arm checks
+        uint16_t distance_cm;           // distance: in cm
+        uint16_t voltage_mv;            // voltage in millivolts, if applicable, otherwise 0
+        enum RangeFinder_Status status; // sensor status
+        uint8_t  range_valid_count;     // number of consecutive valid readings (maxes out at 10)
+        bool     pre_arm_check;         // true if sensor has passed pre-arm checks
+        uint16_t pre_arm_distance_min;  // min distance captured during pre-arm checks
+        uint16_t pre_arm_distance_max;  // max distance captured during pre-arm checks
+        uint32_t last_reading_ms;       // system time of last successful update from sensor
 
         AP_Int8  type;
         AP_Int8  pin;
@@ -148,6 +154,7 @@ public:
     bool has_data_orient(enum Rotation orientation) const;
     uint8_t range_valid_count_orient(enum Rotation orientation) const;
     const Vector3f &get_pos_offset_orient(enum Rotation orientation) const;
+    uint32_t last_reading_ms(enum Rotation orientation) const;
 
     /*
       set an externally estimated terrain height. Used to enable power

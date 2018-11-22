@@ -116,6 +116,7 @@ const AP_Param::GroupInfo AP_ADSB::var_info[] = {
     // @Param: SQUAWK
     // @DisplayName: Squawk code
     // @Description: VFR squawk (Mode 3/A) code is a pre-programmed default code when the pilot is flying VFR and not in contact with ATC. In the USA, the VFR squawk code is octal 1200 (hex 0x280, decimal 640) and in most parts of Europe the VFR squawk code is octal 7000. If an invalid octal number is set then it will be reset to 1200.
+    // @Range: 0 7777
     // @Units: octal
     // @User: Advanced
     AP_GROUPINFO("SQUAWK",  10, AP_ADSB, out_state.cfg.squawk_octal_param, ADSB_SQUAWK_OCTAL_DEFAULT),
@@ -639,7 +640,7 @@ uint8_t AP_ADSB::get_encoded_callsign_null_char()
 
     // using the above logic, we must always assign the squawk. once we get configured
     // externally then get_encoded_callsign_null_char() stops getting called
-    snprintf(out_state.cfg.callsign, 5, "%04d", unsigned(out_state.cfg.squawk_octal));
+    snprintf(out_state.cfg.callsign, 5, "%04d", unsigned(out_state.cfg.squawk_octal) & 0x1FFF);
     memset(&out_state.cfg.callsign[4], 0, 5); // clear remaining 5 chars
     encoded_null |= 0x40;
 

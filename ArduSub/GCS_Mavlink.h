@@ -12,10 +12,8 @@ protected:
         return 0;
     };
 
-    Compass *get_compass() const override;
     AP_Mission *get_mission() override;
     AP_Rally *get_rally() const override;
-    AP_Camera *get_camera() const override;
 
     MAV_RESULT handle_flight_termination(const mavlink_command_long_t &packet) override;
 
@@ -24,6 +22,7 @@ protected:
     bool set_mode(uint8_t mode) override;
     bool should_zero_rc_outputs_on_reboot() const override { return true; }
 
+    MAV_RESULT handle_command_do_set_roi(const Location &roi_loc) override;
     MAV_RESULT _handle_command_preflight_calibration_baro() override;
     MAV_RESULT _handle_command_preflight_calibration(const mavlink_command_long_t &packet) override;
     MAV_RESULT handle_command_int_packet(const mavlink_command_int_t &packet) override;

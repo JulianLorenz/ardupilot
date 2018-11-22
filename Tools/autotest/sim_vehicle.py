@@ -80,10 +80,10 @@ class CompatOptionParser(optparse.OptionParser):
 
                 for line in help_text.split("\n"):
                     help_lines = tw.wrap(line)
-                    for line in help_lines:
+                    for wline in help_lines:
                         result.extend(["%*s%s\n" % (self.help_position,
                                                     "",
-                                                    line)])
+                                                    wline)])
             elif opts[-1] != "\n":
                 result.append("\n")
             return "".join(result)
@@ -101,10 +101,10 @@ class CompatOptionParser(optparse.OptionParser):
                                        **kwargs)
 
     def error(self, error):
-        '''Override default error handler called by
+        """Override default error handler called by
         optparse.OptionParser.parse_args when a parse error occurs;
         raise a detailed exception which can be caught
-        '''
+        """
         if error.find("no such option") != -1:
             raise CompatError(error, self.values, self.rargs)
 
@@ -452,8 +452,15 @@ def progress_cmd(what, cmd):
 def run_cmd_blocking(what, cmd, quiet=False, check=False, **kw):
     if not quiet:
         progress_cmd(what, cmd)
-    p = subprocess.Popen(cmd, **kw)
-    ret = os.waitpid(p.pid, 0)
+
+    try:
+        p = subprocess.Popen(cmd, **kw)
+        ret = os.waitpid(p.pid, 0)
+    except Exception as e:
+        print("[%s] An exception has occurred with command: '%s'" % (what, (' ').join(cmd)))
+        print(e)
+        sys.exit(1)
+
     _, sts = ret
     if check and sts != 0:
         progress("(%s) exited with code %d" % (what, sts,))
@@ -497,18 +504,18 @@ def run_in_terminal_window(autotest, name, cmd):
 tracker_uarta = None  # blemish
 
 
-def start_antenna_tracker(autotest, cmd_opts):
+def start_antenna_tracker(autotest, opts):
     """Compile and run the AntennaTracker, add tracker to mavproxy"""
 
     global tracker_uarta
     progress("Preparing antenna tracker")
     tracker_home = find_location_by_name(find_autotest_dir(),
-                                         cmd_opts.tracker_location)
+                                         opts.tracker_location)
     vehicledir = os.path.join(autotest, "../../" + "AntennaTracker")
-    opts = vinfo.options["AntennaTracker"]
-    tracker_default_frame = opts["default_frame"]
-    tracker_frame_options = opts["frames"][tracker_default_frame]
-    do_build(vehicledir, cmd_opts, tracker_frame_options)
+    options = vinfo.options["AntennaTracker"]
+    tracker_default_frame = options["default_frame"]
+    tracker_frame_options = options["frames"][tracker_default_frame]
+    do_build(vehicledir, opts, tracker_frame_options)
     tracker_instance = 1
     oldpwd = os.getcwd()
     os.chdir(vehicledir)

@@ -128,7 +128,7 @@ const AP_Param::GroupInfo AP_BattMonitor_Params::var_info[] = {
     // @DisplayName: Low battery failsafe action
     // @Description: What action the vehicle should perform if it hits a low battery failsafe
     // @Values{Plane}: 0:None,1:RTL,2:Land,3:Terminate
-    // @Values{Copter}: 0:None,1:Land,2:RTL,3:SmartRTL,4:SmartRTL or Land,5:Terminate
+    // @Values{Copter}: 0:None,1:Land,2:RTL,3:SmartRTL or RTL,4:SmartRTL or Land,5:Terminate
     // @Values{Sub}: 0:None,2:Disarm,3:Enter surface mode
     // @Values{Rover}: 0:None,1:RTL,2:Hold,3:SmartRTL,4:SmartRTL or Hold,5:Terminate
     // @Values{Tracker}: 0:None
@@ -139,12 +139,28 @@ const AP_Param::GroupInfo AP_BattMonitor_Params::var_info[] = {
     // @DisplayName: Critical battery failsafe action
     // @Description: What action the vehicle should perform if it hits a critical battery failsafe
     // @Values{Plane}: 0:None,1:RTL,2:Land,3:Terminate
-    // @Values{Copter}: 0:None,1:Land,2:RTL,3:SmartRTL,4:SmartRTL or Land,5:Terminate
+    // @Values{Copter}: 0:None,1:Land,2:RTL,3:SmartRTL or RTL,4:SmartRTL or Land,5:Terminate
     // @Values{Sub}: 0:None,2:Disarm,3:Enter surface mode
     // @Values{Rover}: 0:None,1:RTL,2:Hold,3:SmartRTL,4:SmartRTL or Hold,5:Terminate
     // @Values{Tracker}: 0:None
     // @User: Standard
     AP_GROUPINFO("FS_CRT_ACT", 17, AP_BattMonitor_Params, _failsafe_critical_action, 0),
+
+    // @Param: ARM_VOLT
+    // @DisplayName: Required arming voltage
+    // @Description: Battery voltage level which is required to arm the aircraft. Set to 0 to allow arming at any voltage.
+    // @Units: V
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("ARM_VOLT", 18, AP_BattMonitor_Params, _arming_minimum_voltage, 0),
+
+    // @Param: ARM_MAH
+    // @DisplayName: Required arming remaining capacity
+    // @Description: Battery capacity remaining which is required to arm the aircraft. Set to 0 to allow arming at any capacity. Note that execept for smart batteries rebooting the vehicle will always reset the remaining capacity estimate, which can lead to this check not providing sufficent protection, it is recommended to always use this in conjunction with the @PREFIX@_ARM_VOLT parameter.
+    // @Units: mAh
+    // @Increment: 50
+    // @User: Advanced
+    AP_GROUPINFO("ARM_MAH", 19, AP_BattMonitor_Params, _arming_minimum_capacity, 0),
 
     AP_GROUPEND
 

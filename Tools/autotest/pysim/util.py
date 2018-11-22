@@ -5,6 +5,7 @@ import math
 import os
 import random
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,8 @@ if (sys.version_info[0] >= 3):
     ENCODING = 'ascii'
 else:
     ENCODING = None
+
+RADIUS_OF_EARTH = 6378100.0  # in meters
 
 def m2ft(x):
     """Meters to feet."""
@@ -89,12 +92,15 @@ def relwaf():
     return "./modules/waf/waf-light"
 
 
-def waf_configure(board, j=None, debug=False):
+def waf_configure(board, j=None, debug=False, extra_args=[]):
     cmd_configure = [relwaf(), "configure", "--board", board]
     if debug:
         cmd_configure.append('--debug')
     if j is not None:
         cmd_configure.extend(['-j', str(j)])
+    pieces = [shlex.split(x) for x in extra_args]
+    for piece in pieces:
+        cmd_configure.extend(piece)
     run_cmd(cmd_configure, directory=topdir(), checkfail=True)
 
 
@@ -102,12 +108,12 @@ def waf_clean():
     run_cmd([relwaf(), "clean"], directory=topdir(), checkfail=True)
 
 
-def build_SITL(build_target, j=None, debug=False, board='sitl', clean=True, configure=True):
+def build_SITL(build_target, j=None, debug=False, board='sitl', clean=True, configure=True, extra_configure_args=[]):
     """Build desktop SITL."""
 
     # first configure
     if configure:
-        waf_configure(board, j=j, debug=debug)
+        waf_configure(board, j=j, debug=debug, extra_args=extra_configure_args)
 
     # then clean
     if clean:
@@ -134,6 +140,17 @@ def build_examples(board, j=None, debug=False, clean=False):
     run_cmd(cmd_make, directory=topdir(), checkfail=True, show=True)
     return True
 
+def build_tests(board, j=None, debug=False, clean=False):
+    # first configure
+    waf_configure(board, j=j, debug=debug)
+
+    # then clean
+    if clean:
+        waf_clean()
+
+    # then build
+    run_cmd([relwaf(), "tests"], directory=topdir(), checkfail=True, show=True)
+    return True
 
 # list of pexpect children to close on exit
 close_list = []
@@ -196,6 +213,7 @@ def valgrind_log_filepath(binary, model):
 def kill_screen_gdb():
     cmd = ["screen", "-X", "-S", "ardupilot-gdb", "quit"]
     subprocess.Popen(cmd)
+
 
 def start_SITL(binary,
                valgrind=False,
@@ -286,7 +304,6 @@ def start_SITL(binary,
     first = cmd[0]
     rest = cmd[1:]
     child = pexpect.spawn(first, rest, logfile=sys.stdout, encoding=ENCODING, timeout=5)
-    delaybeforesend = 0
     pexpect_autoclose(child)
     # give time for parameters to properly setup
     time.sleep(3)
@@ -435,8 +452,6 @@ def BodyRatesToEarthRates(dcm, gyro):
     psiDot   = (q * sin(phi) + r * cos(phi)) / cos(theta)
     return Vector3(phiDot, thetaDot, psiDot)
 
-radius_of_earth = 6378100.0  # in meters
-
 
 def gps_newpos(lat, lon, bearing, distance):
     """Extrapolate latitude/longitude given a heading and distance
@@ -447,7 +462,7 @@ def gps_newpos(lat, lon, bearing, distance):
     lat1 = radians(lat)
     lon1 = radians(lon)
     brng = radians(bearing)
-    dr = distance / radius_of_earth
+    dr = distance / RADIUS_OF_EARTH
 
     lat2 = asin(sin(lat1) * cos(dr) +
                 cos(lat1) * sin(dr) * cos(brng))
@@ -469,7 +484,7 @@ def gps_distance(lat1, lon1, lat2, lon2):
 
     a = math.sin(0.5 * dLat)**2 + math.sin(0.5 * dLon)**2 * math.cos(lat1) * math.cos(lat2)
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
-    return radius_of_earth * c
+    return RADIUS_OF_EARTH * c
 
 
 def gps_bearing(lat1, lon1, lat2, lon2):
@@ -528,7 +543,7 @@ class Wind(object):
         return (speed, self.direction)
 
     # Calculate drag.
-    def drag(self, velocity, deltat=None, testing=None):
+    def drag(self, velocity, deltat=None):
         """Return current wind force in Earth frame.  The velocity parameter is
            a Vector3 of the current velocity of the aircraft in earth frame, m/s ."""
         from math import radians
@@ -621,6 +636,7 @@ def constrain(value, minv, maxv):
     if value > maxv:
         value = maxv
     return value
+
 
 if __name__ == "__main__":
     import doctest

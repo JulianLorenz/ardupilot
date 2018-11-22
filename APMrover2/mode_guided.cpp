@@ -7,9 +7,8 @@ bool ModeGuided::_enter()
     set_desired_speed_to_default();
 
     // set desired location to reasonable stopping point
-    Location stopping_point;
     calc_stopping_location(_destination);
-    set_desired_location(stopping_point);
+    set_desired_location(_destination);
 
     return true;
 }
@@ -29,8 +28,8 @@ void ModeGuided::update()
             // determine if we should keep navigating
             if (!_reached_destination || (rover.is_boat() && !near_wp)) {
                 // drive towards destination
-                calc_steering_to_waypoint(_reached_destination ? rover.current_loc : _origin, _destination);
-                calc_throttle(calc_reduced_speed_for_turn_or_distance(_desired_speed), true, true);
+                calc_steering_to_waypoint(_reached_destination ? rover.current_loc : _origin, _destination, _reversed);
+                calc_throttle(calc_reduced_speed_for_turn_or_distance(_reversed ? -_desired_speed : _desired_speed), true, true);
             } else {
                 stop_vehicle();
             }
@@ -46,7 +45,7 @@ void ModeGuided::update()
             }
             if (have_attitude_target) {
                 // run steering and throttle controllers
-                calc_steering_to_heading(_desired_yaw_cd, _desired_speed < 0);
+                calc_steering_to_heading(_desired_yaw_cd);
                 calc_throttle(calc_reduced_speed_for_turn_or_distance(_desired_speed), true, true);
             } else {
                 stop_vehicle();
@@ -91,10 +90,11 @@ float ModeGuided::get_distance_to_destination() const
 }
 
 // set desired location
-void ModeGuided::set_desired_location(const struct Location& destination)
+void ModeGuided::set_desired_location(const struct Location& destination,
+                                      float next_leg_bearing_cd)
 {
     // call parent
-    Mode::set_desired_location(destination);
+    Mode::set_desired_location(destination, next_leg_bearing_cd);
 
     // handle guided specific initialisation and logging
     _guided_mode = ModeGuided::Guided_WP;

@@ -252,8 +252,8 @@ void SITL_State::_output_to_flightgear(void)
 
     fdm.version = 0x18;
     fdm.padding = 0;
-    fdm.longitude = radians(sfdm.longitude);
-    fdm.latitude = radians(sfdm.latitude);
+    fdm.longitude = DEG_TO_RAD_DOUBLE*sfdm.longitude;
+    fdm.latitude = DEG_TO_RAD_DOUBLE*sfdm.latitude;
     fdm.altitude = sfdm.altitude;
     fdm.agl = sfdm.altitude;
     fdm.phi   = radians(sfdm.rollDeg);
@@ -399,10 +399,6 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
         // never allow negative wind velocity
         wind_speed = MAX(wind_speed, 0);
     }
-    
-    if (altitude < 0) {
-        altitude = 0;
-    }
 
     input.wind.speed = wind_speed;
     input.wind.direction = wind_direction;
@@ -436,7 +432,7 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
     } else if (_vehicle == APMrover2) {
         input.servos[2] = static_cast<uint16_t>(constrain_int16(input.servos[2], 1000, 2000));
         input.servos[0] = static_cast<uint16_t>(constrain_int16(input.servos[0], 1000, 2000));
-        motors_on = ((input.servos[2] - 1500) / 500.0f) != 0;
+        motors_on = !is_zero(((input.servos[2] - 1500) / 500.0f));
     } else {
         motors_on = false;
         // run checks on each motor
@@ -512,7 +508,12 @@ void SITL_State::set_height_agl(void)
 {
     static float home_alt = -1;
 
-    if (home_alt == -1 && _sitl->state.altitude > 0) {
+    if (!_sitl) {
+        // in example program
+        return;
+    }
+
+    if (is_equal(home_alt, -1.0f) && _sitl->state.altitude > 0) {
         // remember home altitude as first non-zero altitude
         home_alt = _sitl->state.altitude;
     }

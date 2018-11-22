@@ -17,6 +17,8 @@ void Tracker::init_tracker()
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
 
+    init_capabilities();
+
     // Check the EEPROM format version before loading any parameters from EEPROM
     load_parameters();
 
@@ -33,7 +35,7 @@ void Tracker::init_tracker()
     // Register mavlink_delay_cb, which will run anytime you have
     // more than 5ms remaining in your call to hal.scheduler->delay
     hal.scheduler->register_delay_callback(mavlink_delay_cb_static, 5);
-    
+
     BoardConfig.init();
 #if HAL_WITH_UAVCAN
     BoardConfig_CAN.init();
@@ -100,8 +102,6 @@ void Tracker::init_tracker()
         get_home_eeprom(current_loc);
     }
 
-    init_capabilities();
-
     gcs().send_text(MAV_SEVERITY_INFO,"Ready to track");
     hal.scheduler->delay(1000); // Why????
 
@@ -158,9 +158,6 @@ void Tracker::set_home(struct Location temp)
     if (ahrs.get_origin(ekf_origin)) {
         ahrs.set_home(temp);
     }
-
-    gcs().send_home();
-    gcs().send_ekf_origin();
 }
 
 void Tracker::arm_servos()

@@ -86,7 +86,7 @@ void AP_GPS_Backend::make_gps_time(uint32_t bcd_date, uint32_t bcd_milliseconds)
     msec = v % 1000; v /= 1000;
     sec  = v % 100; v /= 100;
     min  = v % 100; v /= 100;
-    hour = v % 100; v /= 100;
+    hour = v % 100;
 
     int8_t rmon = mon - 2;
     if (0 >= rmon) {    
@@ -158,14 +158,14 @@ void AP_GPS_Backend::_detection_message(char *buffer, const uint8_t buflen) cons
 
 void AP_GPS_Backend::broadcast_gps_type() const
 {
-    char buffer[64];
+    char buffer[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN+1];
     _detection_message(buffer, sizeof(buffer));
     gcs().send_text(MAV_SEVERITY_INFO, buffer);
 }
 
 void AP_GPS_Backend::Write_DataFlash_Log_Startup_messages() const
 {
-    char buffer[64];
+    char buffer[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN+1];
     _detection_message(buffer, sizeof(buffer));
     DataFlash_Class::instance()->Log_Write_Message(buffer);
 }

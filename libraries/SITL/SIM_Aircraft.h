@@ -18,6 +18,9 @@
 
 #pragma once
 
+#define SIMOUT_IP_ADDRESS "192.168.100.2"
+#define SIMOUT_IP_PORT 9004
+
 #include <AP_Math/AP_Math.h>
 
 #include <AP_HAL/utility/Socket.h>
@@ -126,8 +129,8 @@ protected:
     };
 
     SocketAPM socket_ext_sensor; //Output socket for external sensor simulation
-    const char * address_ext_sensor = "127.0.0.1";
-    int port_ext_sensor = 9004;
+    const char * address_ext_sensor = SIMOUT_IP_ADDRESS;
+    int port_ext_sensor = SIMOUT_IP_PORT;
 
     float ground_level;
     float home_yaw;

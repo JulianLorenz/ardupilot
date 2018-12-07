@@ -18,8 +18,7 @@
 
 #pragma once
 
-#define SIMOUT_IP_ADDRESS "192.168.100.2"
-#define SIMOUT_IP_PORT 9004
+#include "../../PosSim.h"
 
 #include <AP_Math/AP_Math.h>
 

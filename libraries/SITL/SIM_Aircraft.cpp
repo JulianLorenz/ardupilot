@@ -88,6 +88,7 @@ Aircraft::Aircraft(const char *home_str, const char *frame_str) :
     terrain = reinterpret_cast<AP_Terrain *>(AP_Param::find_object("TERRAIN_"));
 
     //Setup socket for external sensor simulation
+    printf("Printing simulation output to UDP socket %s:%d\n", SIMOUT_IP_ADDRESS,SIMOUT_IP_PORT);
     socket_ext_sensor.connect(address_ext_sensor,port_ext_sensor);
     socket_ext_sensor.set_blocking(false);
 }

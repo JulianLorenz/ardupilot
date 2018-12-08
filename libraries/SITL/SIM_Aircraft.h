@@ -130,6 +130,7 @@ protected:
     SocketAPM socket_ext_sensor; //Output socket for external sensor simulation
     const char * address_ext_sensor = SIMOUT_IP_ADDRESS;
     int port_ext_sensor = SIMOUT_IP_PORT;
+    uint64_t last_simout;
 
     float ground_level;
     float home_yaw;

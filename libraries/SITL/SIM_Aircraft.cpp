@@ -91,6 +91,7 @@ Aircraft::Aircraft(const char *home_str, const char *frame_str) :
     printf("Printing simulation output to UDP socket %s:%d\n", SIMOUT_IP_ADDRESS,SIMOUT_IP_PORT);
     socket_ext_sensor.connect(address_ext_sensor,port_ext_sensor);
     socket_ext_sensor.set_blocking(false);
+    last_simout = 0;
 }
 
 
@@ -192,12 +193,15 @@ void Aircraft::update_position(void)
 
     Quaternion attitude;
     get_attitude(attitude);
-    struct ext_sensor_packet pkt = {
-      {attitude.q1,attitude.q2,attitude.q3,attitude.q4},
-      {velocity_ef.x,velocity_ef.y,velocity_ef.z},
-      {position.x,position.y,position.z}
-    };
-    socket_ext_sensor.send(&pkt,10*sizeof(double));
+    if((last_simout+SIMOUT_PERIOD)<time_now_us){
+        last_simout = time_now_us;
+        struct ext_sensor_packet pkt = {
+          {attitude.q1,attitude.q2,attitude.q3,attitude.q4},
+          {velocity_ef.x,velocity_ef.y,velocity_ef.z},
+          {position.x,position.y,position.z}
+        };
+        socket_ext_sensor.send(&pkt,10*sizeof(double));
+    }
 #if 0
     // logging of raw sitl data
     Vector3f accel_ef = dcm * accel_body;
